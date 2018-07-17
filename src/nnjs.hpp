@@ -18,7 +18,8 @@ namespace NN {
 
 // Public constants / params
 
-extern bool DIV_IN_TRAIN; // = false; 
+// Use "/" instaed of * during train. Used in unit tests only, should be false on production
+extern bool DIV_IN_TRAIN;
 
 // Tools
 
@@ -27,14 +28,22 @@ namespace Internal {
 //var PRNG = new Random(1363990714); // would not train on 2+1 -> 2+1 -> 1 configuration
 extern Random PRNG; // PRNG = new Random(new Date().getTime());
 
+// Return random float in range [min..max] inclusive
 inline double getRandom (double min, double max)
 {
-  return (PRNG.NextFloat() * (max - min)) + min;
+  return (PRNG.randFloat(min, max));
 }
 
-inline int32_t getRandomInt (int32_t min, int32_t max)
+// Return integer in range [from..limit) :: from-inclusive, limit-exclusive
+inline int32_t getRandomInt (int32_t from, int32_t limit)
 {
-  return ((int)std::floor((PRNG.NextFloat() * (max - min)) + min)) % max; // TODO: Verify me
+  return ((int)std::floor((PRNG.nextFloat() * (limit - from)) + from)) % limit; // TODO: Verify me
+}
+
+// Return integer in range [0, limit) :: 0-inclusive, limit-exclusive
+inline int32_t getRandomInt (int32_t limit)
+{
+  return getRandomInt (0, limit);
 }
 
 } // Internal
