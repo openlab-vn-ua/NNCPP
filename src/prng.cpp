@@ -27,17 +27,17 @@ int32_t Random::rand()
   return this->next() - this->NEXT_MIN;
 }
 
-inline double Random::randFloat()
+double Random::randFloat()
 {
   return static_cast<double>(this->rand()) / this->RAND_MAX_VALUE;
 }
 
-inline double Random::randFloat(double max)
+double Random::randFloat(double max)
 {
   return randFloat() * max;
 }
 
-inline double Random::randFloat(double min, double max)
+double Random::randFloat(double min, double max)
 {
   double diff = max - min;
   return randFloat() * diff + min;

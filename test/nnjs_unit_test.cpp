@@ -230,6 +230,85 @@ static bool doUnitTestRNG2()
   return(isOk);
 }
 
+#define TEST_RNG_MAX_COUNT 1000000
+
+static int32_t getTestRNGCountSeed()
+{ 
+  return(42); 
+}
+
+static bool doUnitTestRNG3()
+{
+  bool isOk = true;
+  Random TRNG(getTestRNGCountSeed());
+  double r;
+  for (int i = 0; i < TEST_RNG_MAX_COUNT; i++)
+  {
+    r = TRNG.nextFloat();
+    if (r < 0) { isOk = false; break; }
+    if (r >= 1.0) { isOk = false; break; }
+  }
+  if (!isOk) { CONSOLE_LOG("FAIL", r); }
+  return(isOk);
+}
+
+static bool doUnitTestRNG4()
+{
+  bool isOk = true;
+  Random TRNG(getTestRNGCountSeed());
+  double r;
+  for (int i = 0; i < TEST_RNG_MAX_COUNT; i++)
+  {
+    r = TRNG.randFloat();
+    if (r < 0) { isOk = false; break; }
+    if (r > 1.0) { isOk = false; break; }
+  }
+  if (!isOk) { CONSOLE_LOG("FAIL", r); }
+  return(isOk);
+}
+
+static bool doUnitTestRNG5()
+{
+  bool isOk = true;
+  Random TRNG(getTestRNGCountSeed());
+  double r;
+  double TMAX = TRNG.RAND_MAX_VALUE / 64.0;
+  int cmax = 0;
+  for (int i = 0; i < TEST_RNG_MAX_COUNT; i++)
+  {
+    r = TRNG.randFloat(TMAX);
+    if (r < 0) { isOk = false; break; }
+    if (r > TMAX) { isOk = false; break; }
+    if (r == TMAX) { cmax++; }
+  }
+  if (!isOk) { CONSOLE_LOG("FAIL", r); }
+  //if (isOk) { if (cmax <= 0) { isOk = false; CONSOLE_LOG("FAIL: no max found"); } }
+  return(isOk);
+}
+
+static bool doUnitTestRNG6()
+{
+  bool isOk = true;
+  Random TRNG(getTestRNGCountSeed());
+  double r;
+  double TMIN = 3333;
+  double TMAX = 5555;
+  int cmin = 0;
+  int cmax = 0;
+  for (int i = 0; i < TEST_RNG_MAX_COUNT; i++)
+  {
+    r = TRNG.randFloat(TMIN, TMAX);
+    if (r < TMIN) { isOk = false; break; }
+    if (r > TMAX) { isOk = false; break; }
+    if (r == TMIN) { cmin++; }
+    if (r == TMAX) { cmax++; }
+  }
+  if (!isOk) { CONSOLE_LOG("FAIL", r); }
+  //if (isOk) { if (cmax <= 0) { isOk = false; CONSOLE_LOG("FAIL: no max found"); } }
+  //if (isOk) { if (cmin <= 0) { isOk = false; CONSOLE_LOG("FAIL: no min found"); } }
+  return(isOk);
+}
+
 
 //extern
 bool runUnitTests()
@@ -239,6 +318,10 @@ bool runUnitTests()
     &doUnitTest1, 
     &doUnitTestRNG1, 
     &doUnitTestRNG2, 
+    &doUnitTestRNG3, 
+    &doUnitTestRNG4, 
+    &doUnitTestRNG5, 
+    &doUnitTestRNG6, 
   };
 
   auto count = TESTS.size();
