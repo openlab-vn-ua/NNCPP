@@ -1,4 +1,6 @@
-// Main test app
+// Simple Neural Network toolkit
+// Open Source Software under MIT License
+// [Main test app]
 
 #include <nnjs.hpp>
 

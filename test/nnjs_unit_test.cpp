@@ -1,3 +1,6 @@
+// Simple Neural Network toolkit
+// Open Source Software under MIT License
+// [Unit test]
 
 #include "nnjs_unit_test.hpp"
 

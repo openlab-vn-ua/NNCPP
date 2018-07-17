@@ -1,4 +1,5 @@
-// JavaScript Simple Neural Network toolkit
+// Simple Neural Network toolkit
+// Open Source Software under MIT License
 // [Xor demo network]
 
 #include "nnjs_xor_sample.hpp"
@@ -26,7 +27,7 @@ void sampleXorNetwork()
 
   auto result = NN::doTrain(NET, DATAS, TARGS);
 
-  std::cout << "XOR Training result:" << result << "\n";
+  std::cout << "XOR Training result:" << (result ? "OK" : "FAIL") << "\n";
 }
 
 } } // NN:Demo

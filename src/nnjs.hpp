@@ -3,8 +3,7 @@
 
 // Simple Neural Network toolkit
 // [CORE]
-// Initally Written by Serge Ageyev
-// Open Source Software under BSD License
+// Open Source Software under MIT License
 // Based on nnjs.js JavaScrtipt NN framework
 
 #include <stdint.h>
