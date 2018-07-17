@@ -694,17 +694,42 @@ class EpsTraningResutChecker : public BaseTraningResutChecker
   }
 };
 
-#define CONSOLE_LOG(...) // Nothing to do yet
-
-inline bool doTrain(Network &NET, const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, double SPEED = -1, int MAX_N = -1, int REP_N = -1, BaseTraningResutChecker *isTrainDoneFunc = NULL)
+class TrainProgress
 {
-  if (MAX_N < 0)       { MAX_N = 50000; }
-  if (REP_N < 0)       { REP_N =   100; } // report interval
-  if (SPEED < 0)       { SPEED = 0.125; }
+  public: class TrainingArgs
+  {
+    public:
+    Network   &NET; 
+    const      std::vector<std::vector<double>> &DATAS;
+    const      std::vector<std::vector<double>> &TARGS;
+    double     SPEED;
+
+    TrainingArgs(Network &NET, const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, double SPEED)
+      : NET(NET), DATAS(DATAS), TARGS(TARGS), SPEED(SPEED)
+    {
+    }
+  };
+
+  public: virtual void onTrainingBegin(TrainingArgs *args) { }
+  public: virtual bool onTrainingStep (TrainingArgs *args, int i, int maxCount) { return true; } // return false to abort training
+  public: virtual void onTrainingEnd  (TrainingArgs *args, bool isOk) { }
+};
+
+const int    DEFAULT_TRAIN_COUNT    = 50000;
+const double DEFAULT_TRAINING_SPEED = 0.125;
+
+inline bool doTrain(Network &NET, const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, double SPEED = -1, int MAX_N = -1, TrainProgress *progressReporter = NULL, BaseTraningResutChecker *isTrainDoneFunc = NULL)
+{
+  if (MAX_N < 0)       { MAX_N = DEFAULT_TRAIN_COUNT; }
+  if (SPEED < 0)       { SPEED = DEFAULT_TRAINING_SPEED; }
 
   EpsTraningResutChecker isTrainDoneDefaultFunc;
 
   if (isTrainDoneFunc == NULL) { isTrainDoneFunc = &isTrainDoneDefaultFunc; }
+
+  TrainProgress::TrainingArgs trainArgs(NET, DATAS, TARGS, SPEED);
+
+  if (progressReporter != NULL) { progressReporter->onTrainingBegin(&trainArgs); }
 
   bool isDone = false;
   for (int n = 0; (n < MAX_N) && (!isDone); n++)
@@ -715,18 +740,17 @@ inline bool doTrain(Network &NET, const std::vector<std::vector<double>> &DATAS,
       CALCS.push_back(doProc(NET, DATAS[s])); // Fill output
     }
 
-    isDone = isTrainDoneFunc->isTraningDone(DATAS, TARGS, CALCS);
-
-    if ((REP_N != NULL) && (REP_N != 0))
-    {
-      if (((n % REP_N) == 0) || (isDone))
+    if (progressReporter != NULL)
+    { 
+      if (!progressReporter->onTrainingStep(&trainArgs, n, MAX_N))
       {
-        for (size_t s = 0; s < DATAS.size(); s++)
-        {
-          CONSOLE_LOG("Result.N[n,s]", MAX_N, n, s, DATAS[s], TARGS[s], CALCS[s]);
-        }
+        // Abort training
+        progressReporter->onTrainingEnd(&trainArgs, false);
+        return(false); // 
       }
     }
+
+    isDone = isTrainDoneFunc->isTraningDone(DATAS, TARGS, CALCS);
 
     if (!isDone)
     {
@@ -737,16 +761,12 @@ inline bool doTrain(Network &NET, const std::vector<std::vector<double>> &DATAS,
     }
   }
 
-  if (isDone)
-  {
-    if ((REP_N != NULL) && (REP_N != 0)) { CONSOLE_LOG("Training OK", "iterations:", n, NET); }
-    return(true);
+  if (progressReporter != NULL)
+  { 
+    progressReporter->onTrainingEnd(&trainArgs, isDone);
   }
-  else
-  {
-    if ((REP_N != NULL) && (REP_N != 0)) { CONSOLE_LOG("Training FAILED", "timeout:", MAX_N, NET ); }
-    return(false);
-  }
+
+  return(isDone);
 }
 
 // Some internals

@@ -17,6 +17,8 @@
 // Test case(s)
 // ---------------------------------
 
+#define CONSOLE_LOG(...) // Nothing to do yet
+
 namespace NN { namespace Test {
 
 #define TEST_DEFAULT_EPS 0.0001
