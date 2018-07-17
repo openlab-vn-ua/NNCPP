@@ -3,12 +3,12 @@
 
 #include <stdint.h>
 
-/**
- * Creates a pseudo-random value generator. The seed must be an integer.
- * Uses an optimized version of the Park-Miller PRNG.
- * http://www.firstpr.com.au/dsp/rand31/
- * TODO: Returns only positive values. Rename me to PosRandom?
- */
+// Simple Random value generator
+// Uses an optimized version of the Park-Miller PRNG.
+// Inspired by 
+// http://www.firstpr.com.au/dsp/rand31/
+// https://gist.github.com/blixt/f17b47c62508be59987b
+// Open Source Software under MIT License
 
 class Random
 {
@@ -18,13 +18,45 @@ class Random
 
   public: Random() : Random(42) { }
 
-  /// Returns a pseudo-random value between 1 and 2^32 - 2.
-  public: int32_t Next();
-  public: int32_t next() { return Next(); } // synonim
+  public: enum _:int32_t
+  {
+    /// Min output value for next() == 1
+    NEXT_MIN = 1,
 
-  /// Returns a pseudo-random floating point number in range [0, 1).
-  public: double NextFloat();
-  public: double nextFloat() { return NextFloat(); } // synonim
+    /// Max output value for next() == 2^31-2
+    NEXT_MAX = 2147483646,
+  };
+
+  /// Returns a pseudo-random value between NEXT_MIN (1) and NEXT_MAX (2^32 - 2) [NEXT_MIN .. NEXT_MAX] (inclusive)
+  public: int32_t next();
+  public: int32_t Next() { return next(); } // synonim
+
+  /// Returns a pseudo-random floating point number in range [0.0 .. 1.0) (upper bound exclsive)
+  public: double nextFloat();
+  public: double NextFloat() { return nextFloat(); } // synonim
+
+  // Like C Random
+
+  public: enum __:int32_t
+  {
+    /// Maximum output value for rand() == [0..RAND_MAX]
+    RAND_MAX_VALUE = (_::NEXT_MAX - _::NEXT_MIN),
+    #if !defined(RAND_MAX)
+    RAND_MAX = RAND_MAX_VALUE, // Unfortunately RAND_MAX is a macro in most cases, so we cannot define this identifier in that case
+    #endif
+  };
+
+  /// Returns next random in range [0..RAND_MAX] (inclusive)
+  public: int32_t rand();
+
+  /// randFloat()        Returns random in range [0.0 .. 1.0] (inclusive)
+  public: double randFloat();
+
+  /// randFloat(max)     Returns random in range [0.0 .. max] (inclusive)
+  public: double randFloat(double max);
+
+  /// randFloat(min,max) Returns random in range [min .. max] (inclusive)
+  public: double randFloat(double min, double max);
 };
 
 #endif
