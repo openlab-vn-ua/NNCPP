@@ -122,11 +122,11 @@ class ProcNeuron : public BaseNeuron
   {
     double out = 0;
 
-    int count = this->w.size();
+    size_t count = this->w.size();
 
     assert(ins.size() == count);
 
-    for (int i = 0; i < count; i++)
+    for (size_t i = 0; i < count; i++)
     {
       out += ins[i] * this->w[i];
     }
@@ -162,9 +162,9 @@ class ProcNeuron : public BaseNeuron
 
   public: void addInputAll(const std::vector<BaseNeuron *> &neurons, const std::vector<double> &weights)
   {
-    int count = neurons.size();
-    int weightsCount = weights.size();
-    for (int i = 0; i < count; i++)
+    size_t count = neurons.size();
+    size_t weightsCount = weights.size();
+    for (size_t i = 0; i < count; i++)
     {
       if (i >= weightsCount)
       {
@@ -189,8 +189,8 @@ class ProcNeuron : public BaseNeuron
 
     std::vector<double> ins;
 
-    int count = this->inputs.size();
-    for (int i = 0; i < count; i++)
+    size_t count = this->inputs.size();
+    for (size_t i = 0; i < count; i++)
     {
       ins.push_back(this->inputs[i]->get());
     }
@@ -224,8 +224,8 @@ class ProcNeuronTrainee : public ProcNeuron
 
   public: void addNewWeightsDelta(const double dw[])
   {
-    int count = this->nw.size();
-    for (int i = 0; i < count; i++)
+    size_t count = this->nw.size();
+    for (size_t i = 0; i < count; i++)
     {
       this->nw[i] += dw[i];
     }
@@ -233,11 +233,11 @@ class ProcNeuronTrainee : public ProcNeuron
 
   public: void addNewWeightsDelta(const std::vector<double> &dw)
   {
-    int count = this->nw.size();
+    size_t count = this->nw.size();
 
     assert(count == dw.size());
 
-    for (int i = 0; i < count; i++)
+    for (size_t i = 0; i < count; i++)
     {
       double nwv = this->nw[i] + dw[i];
       this->nw[i] = nwv;
@@ -304,8 +304,8 @@ class Layer
 
   public: virtual ~Layer()
   {
-    int count = this->neurons.size();
-    for (int i = 0; i < count; i++)
+    size_t count = this->neurons.size();
+    for (size_t i = 0; i < count; i++)
     {
       delete this->neurons[i];
     }
@@ -334,8 +334,8 @@ class Layer
 
   public: void addInputAll(const Layer *inputLayer)
   {
-    int count = this->neurons.size();
-    for (int i = 0; i < count; i++)
+    size_t count = this->neurons.size();
+    for (size_t i = 0; i < count; i++)
     {
       auto neuron = dynamic_cast<ProcNeuron *>(this->neurons[i]);
       if (neuron != NULL)
@@ -373,8 +373,8 @@ class Network
 
   public: virtual ~Network()
   {
-    int count = layers.size();
-    for (int i = 0; i < count; i++)
+    size_t count = layers.size();
+    for (size_t i = 0; i < count; i++)
     {
       delete this->layers[i];
     }
@@ -401,7 +401,7 @@ inline void doProcAssignInput(Network &NET, const std::vector<double> &inputs)
 
   // assert(LIN->neurons.size() == inputs.size()); // input layer may have bias neuron(s)
 
-  for (int i = 0; i < LIN->neurons.size(); i++)
+  for (size_t i = 0; i < LIN->neurons.size(); i++)
   {
     auto input = dynamic_cast<InputNeuron*>(LIN->neurons[i]);
 
@@ -436,7 +436,7 @@ inline std::vector<double> doProcGetResult(Network &NET)
 
   Layer *LOUT = NET.layers[NET.layers.size()-1];
 
-  for (int i = 0; i < LOUT->neurons.size(); i++)
+  for (size_t i = 0; i < LOUT->neurons.size(); i++)
   {
     result.push_back(LOUT->neurons[i]->get());
   }
@@ -471,8 +471,8 @@ inline std::vector<double> getDeltaWeights(ProcNeuronTrainee *theNeuron, double 
 
   double dw;
 
-  int count = theNeuron->inputs.size();
-  for (int i = 0; i < count; i++)
+  size_t count = theNeuron->inputs.size();
+  for (size_t i = 0; i < count; i++)
   {
     if (DIV_IN_TRAIN) { dw = DOS / theNeuron->inputs[i]->get(); } else { dw = DOS * theNeuron->inputs[i]->get(); }
     DWS.push_back(dw);
@@ -489,8 +489,8 @@ inline std::vector<double> getDeltaHiddenSums(ProcNeuronTrainee *theNeuron, doub
 
   double ds;
 
-  int count = theNeuron->inputs.size();
-  for (int i = 0; i < count; i++)
+  size_t count = theNeuron->inputs.size();
+  for (size_t i = 0; i < count; i++)
   {
     auto input = dynamic_cast<ProcNeuronTrainee*>(theNeuron->inputs[i]);
     if (input == NULL)
@@ -524,7 +524,7 @@ inline void doTrainStepProcPrevLayer(std::vector<BaseNeuron*> &LOUT, std::vector
     return; // previous layer is an input layer, so skip any action
   }
 
-  for (int i = 0; i < LOUT.size(); i++)
+  for (size_t i = 0; i < LOUT.size(); i++)
   {
     auto neuron = dynamic_cast<ProcNeuronTrainee *>(LOUT[i]);
 
@@ -536,7 +536,7 @@ inline void doTrainStepProcPrevLayer(std::vector<BaseNeuron*> &LOUT, std::vector
 
       assert(LP.size() == DOHS.size());
 
-      for (int ii = 0; ii < LP.size(); ii++)
+      for (size_t ii = 0; ii < LP.size(); ii++)
       {
         auto input = dynamic_cast<ProcNeuronTrainee *>(LP[ii]);
         if (input != NULL)
@@ -561,7 +561,7 @@ inline void doTrainStep(Network &NET, const std::vector<double> &DATA, const std
 
   auto CALC = doProc(NET, DATA); // we need this because sum has to be updated in NET for each neuron for THIS test case
 
-  for (int i = 1; i < NET.layers.size(); i++) // skip input layer
+  for (size_t i = 1; i < NET.layers.size(); i++) // skip input layer
   {
     int iicount = NET.layers[i]->neurons.size();
     for (int ii = 0; ii < iicount; ii++)
@@ -582,7 +582,7 @@ inline void doTrainStep(Network &NET, const std::vector<double> &DATA, const std
   std::vector<double> DOS ; // delta output sum for each output neuron
   std::vector<std::vector<double>> DOIW; // delta output neuron input weights each output neuron
 
-  for (int i = 0; i < LOUT.size(); i++)
+  for (size_t i = 0; i < LOUT.size(); i++)
   {
     auto neuron = dynamic_cast<ProcNeuronTrainee *>(LOUT[i]);
     OSME.push_back((TARG[i] - CALC[i]) * SPEED);
@@ -598,7 +598,7 @@ inline void doTrainStep(Network &NET, const std::vector<double> &DATA, const std
 
   doTrainStepProcPrevLayer(LOUT, DOS, NET.layers.size()-1);
 
-  for (int i = 1; i < NET.layers.size(); i++) // skip input layer
+  for (size_t i = 1; i < NET.layers.size(); i++) // skip input layer
   {
     int iicount = NET.layers[i]->neurons.size();
     for (int ii = 0; ii < iicount; ii++)
@@ -635,7 +635,7 @@ inline bool isResultMatchSimpleFunc(const std::vector<double> &TARG, const std::
 
   assert(TARG.size() == CALC.size());
 
-  for (int ii = 0; ii < TARG.size(); ii++)
+  for (size_t ii = 0; ii < TARG.size(); ii++)
   {
     if (!isResultItemMatch(TARG[ii], CALC[ii]))
     {
@@ -665,7 +665,7 @@ class EpsTraningResutChecker : public BaseTraningResutChecker
   {
     assert(TARGS.size() == CALCS.size());
 
-    for (int s = 0; s < TARGS.size(); s++)
+    for (size_t s = 0; s < TARGS.size(); s++)
     {
       if (!isResultMatchSimpleFunc(TARGS[s], CALCS[s], this->eps))
       {
@@ -701,7 +701,7 @@ inline bool doTrain(Network &NET, const std::vector<std::vector<double>> &DATAS,
   for (int n = 0; (n < MAX_N) && (!isDone); n++)
   {
     std::vector<std::vector<double>> CALCS;
-    for (int s = 0; s < DATAS.size(); s++)
+    for (size_t s = 0; s < DATAS.size(); s++)
     {
       CALCS.push_back(doProc(NET, DATAS[s])); // Fill output
     }
@@ -712,7 +712,7 @@ inline bool doTrain(Network &NET, const std::vector<std::vector<double>> &DATAS,
     {
       if (((n % REP_N) == 0) || (isDone))
       {
-        for (int s = 0; s < DATAS.size(); s++)
+        for (size_t s = 0; s < DATAS.size(); s++)
         {
           CONSOLE_LOG("Result.N[n,s]", MAX_N, n, s, DATAS[s], TARGS[s], CALCS[s]);
         }
@@ -721,7 +721,7 @@ inline bool doTrain(Network &NET, const std::vector<std::vector<double>> &DATAS,
 
     if (!isDone)
     {
-      for (int s = 0; s < DATAS.size(); s++)
+      for (size_t s = 0; s < DATAS.size(); s++)
       {
         doTrainStep(NET, DATAS[s], TARGS[s], SPEED);
       }

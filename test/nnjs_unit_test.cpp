@@ -157,7 +157,7 @@ static bool doUnitTest1()
   std::vector<std::vector<double>> DWSL1; // = [];
   std::vector<std::vector<double>> NWSL1; // = [];
 
-  for (auto i = 0; i < pOut.size(); i++)
+  for (size_t i = 0; i < pOut.size(); i++)
   {
     DWSL1.push_back(NN::getDeltaWeights(NTE(L1->neurons[i]), DHS[i]));
     NTE(L1->neurons[i])->initNewWeights(); // would work this way since only one output neuron (so will be called once for each hidden neuron)
@@ -188,7 +188,7 @@ static bool doUnitTest1()
 
   NTE(OUT->neurons[0])->applyNewWeights();
 
-  for (auto i = 0; i < pOut.size(); i++)
+  for (size_t i = 0; i < pOut.size(); i++)
   {
     NTE(L1->neurons[i])->applyNewWeights();
   }
@@ -326,7 +326,7 @@ bool runUnitTests()
 
   auto count = TESTS.size();
   auto failed = 0;
-  for (auto i = 0; i < count; i++)
+  for (size_t i = 0; i < count; i++)
   {
     auto test = TESTS[i];
     if (!test())
