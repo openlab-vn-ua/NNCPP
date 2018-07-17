@@ -39,14 +39,14 @@ class Random
 
   public: enum __:int32_t
   {
-    /// Maximum output value for rand() == [0..RAND_MAX]
+    /// Maximum output value for rand() == [0..RAND_MAX_VALUE]
     RAND_MAX_VALUE = (_::NEXT_MAX - _::NEXT_MIN),
     #if !defined(RAND_MAX)
     RAND_MAX = RAND_MAX_VALUE, // Unfortunately RAND_MAX is a macro in most cases, so we cannot define this identifier in that case
     #endif
   };
 
-  /// Returns next random in range [0..RAND_MAX] (inclusive)
+  /// Returns next random in range [0..RAND_MAX_VALUE] (inclusive)
   public: int32_t rand();
 
   /// randFloat()        Returns random in range [0.0 .. 1.0] (inclusive)
