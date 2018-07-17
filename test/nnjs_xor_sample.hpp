@@ -7,7 +7,8 @@
 
 namespace NN { namespace Demo {
 
-extern void sampleXorNetwork();
+extern bool sampleXorNetwork();
+extern bool sampleXorNetwork2();
 
 } } // NN::Demo
 

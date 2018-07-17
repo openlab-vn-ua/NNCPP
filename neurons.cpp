@@ -13,14 +13,20 @@ int main()
 {
   if (!NN::Test::runUnitTests())
   {
-    std::cout << "Units tests FAILED" << "\n";
+    std::cout << "Units tests: FAILED" << "\n";
   }
   else
   {
-    std::cout << "Units tests passed OK" << "\n";
+    std::cout << "Units tests: passed OK" << "\n";
   }
 
-  NN::Demo::sampleXorNetwork();
+  bool isOk;
+
+  isOk = NN::Demo::sampleXorNetwork();
+  std::cout << "XOR Training result:" << (isOk ? "OK" : "FAIL") << "\n";
+
+  isOk = NN::Demo::sampleXorNetwork2();
+  std::cout << "XOR2 Training result:" << (isOk ? "OK" : "FAIL") << "\n";
 
   return 0;
 }
