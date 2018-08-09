@@ -703,15 +703,28 @@ class TrainProgress
     const      std::vector<std::vector<double>> &DATAS;
     const      std::vector<std::vector<double>> &TARGS;
     double     SPEED;
+    int        maxStepsCount;
 
-    TrainingArgs(Network &NET, const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, double SPEED)
-      : NET(NET), DATAS(DATAS), TARGS(TARGS), SPEED(SPEED)
+    TrainingArgs(Network &NET, const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, double SPEED, int maxStepsCount)
+      : NET(NET), DATAS(DATAS), TARGS(TARGS), SPEED(SPEED), maxStepsCount(maxStepsCount)
+    {
+    }
+  };
+
+  public: class TrainingStep
+  {
+    public:
+    const      std::vector<std::vector<double>> &CALCS;
+    int        stepIndex;
+
+    TrainingStep(const std::vector<std::vector<double>> &CALCS, int stepIndex)
+      : CALCS(CALCS), stepIndex(stepIndex)
     {
     }
   };
 
   public: virtual void onTrainingBegin(TrainingArgs *args) { }
-  public: virtual bool onTrainingStep (TrainingArgs *args, int i, int maxCount) { return true; } // return false to abort training
+  public: virtual bool onTrainingStep (TrainingArgs *args, TrainingStep *step) { return true; } // return false to abort training
   public: virtual void onTrainingEnd  (TrainingArgs *args, bool isOk) { }
 };
 
@@ -727,7 +740,7 @@ inline bool doTrain(Network &NET, const std::vector<std::vector<double>> &DATAS,
 
   if (isTrainDoneFunc == NULL) { isTrainDoneFunc = &isTrainDoneDefaultFunc; }
 
-  TrainProgress::TrainingArgs trainArgs(NET, DATAS, TARGS, SPEED);
+  TrainProgress::TrainingArgs trainArgs(NET, DATAS, TARGS, SPEED, MAX_N);
 
   if (progressReporter != NULL) { progressReporter->onTrainingBegin(&trainArgs); }
 
@@ -741,12 +754,14 @@ inline bool doTrain(Network &NET, const std::vector<std::vector<double>> &DATAS,
     }
 
     if (progressReporter != NULL)
-    { 
-      if (!progressReporter->onTrainingStep(&trainArgs, n, MAX_N))
+    {
+      TrainProgress::TrainingStep step(CALCS, n);
+
+      if (!progressReporter->onTrainingStep(&trainArgs, &step))
       {
         // Abort training
         progressReporter->onTrainingEnd(&trainArgs, false);
-        return(false); // 
+        return(false);
       }
     }
 
