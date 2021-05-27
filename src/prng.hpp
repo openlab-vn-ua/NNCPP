@@ -14,7 +14,11 @@ class Random
 {
   protected: int64_t seed;
 
-  public: Random(int32_t seed);
+  public: void srand(int32_t seed); // C like API
+  public: void setSeed(int32_t seed) { srand(seed); } // Synonym
+  public: void SetSeed(int32_t seed) { srand(seed); } // Synonym
+
+  public: Random(int32_t seed) { srand(seed); }
 
   public: Random() : Random(42) { }
 
@@ -29,11 +33,11 @@ class Random
 
   /// Returns a pseudo-random value between NEXT_MIN (1) and NEXT_MAX (2^32 - 2) [NEXT_MIN .. NEXT_MAX] (inclusive)
   public: int32_t next();
-  public: int32_t Next() { return next(); } // synonim
+  public: int32_t Next() { return next(); } // Synonym
 
   /// Returns a pseudo-random floating point number in range [0.0 .. 1.0) (upper bound exclsive)
   public: double nextFloat();
-  public: double NextFloat() { return nextFloat(); } // synonim
+  public: double NextFloat() { return nextFloat(); } // Synonym
 
   // Like C Random
 

@@ -3,7 +3,7 @@
 
 #include "prng.hpp"
 
-Random::Random(int32_t seed)
+void Random::srand(int32_t seed)
 {
   if (seed < 0) { seed = -seed; }
   if (seed == 0) { seed = 1; }

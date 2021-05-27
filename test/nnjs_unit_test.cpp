@@ -7,19 +7,44 @@
 #include <cmath>
 #include <vector>
 #include <functional>
-#include <nnjs.hpp>
 
-// Simple Neural Network toolkit
-// [Unit test]
+// Console simulator
+// ----------------------------------------------------
 
-// Require nnjs.js
+#include <string>
+#include <sstream>
+#include <iostream>
 
-// Test case(s)
-// ---------------------------------
+namespace console {
 
-#define CONSOLE_LOG(...) // Nothing to do yet
+template<typename T1> std::string toString(const T1& x) { std::stringstream s; s << x; return s.str(); }
+template<typename T1> std::string toString(const std::vector<T1> &x)
+{ 
+  std::stringstream s;
+  int i = 0;
+  s << "[";
+  for (auto& item : x) 
+  { 
+      if (i > 0) { s << ","; } 
+      s << toString(item); 
+      i++; 
+  }
+  s << "]";
+  return s.str(); 
+}
+
+template<typename T1> void log(T1 a1) { std::cout << toString(a1) << "\n"; };
+template<typename T1, typename T2> void log(const T1 &a1, const T2 &a2) { std::cout << toString(a1) << " " << toString(a2) << "\n"; };
+template<typename T1, typename T2, typename T3> void log(const T1 &a1, const T2 &a2, const T3 &a3) { std::cout << toString(a1) << " " << toString(a2) " " << toString(a3) << "\n"; };
+
+}
+
+// Utils
+// ----------------------------------------------------
 
 namespace NN { namespace Test {
+
+template<typename T1> std::string STR(const T1& x) { return console::toString(x); }
 
 #define TEST_DEFAULT_EPS 0.0001
 
@@ -41,6 +66,15 @@ static bool isFloatListAlmostEqual(const std::vector<double> &a, const std::vect
   }
   return true;
 }
+
+} }
+
+// Test case(s) [NN]
+// ----------------------------------------------------
+
+#include <nnjs.hpp>
+
+namespace NN { namespace Test {
 
 static bool doUnitTest1()
 {
@@ -107,7 +141,7 @@ static bool doUnitTest1()
   if (!isFloatAlmostEqual(CALC,0.7743802720529458))
   {
     isOk = false;
-    CONSOLE_LOG("FAIL: Result", CALC);
+    console::log("FAIL: Result", CALC);
   }
  
   // Adjust Output layer
@@ -117,21 +151,23 @@ static bool doUnitTest1()
   if (!isFloatAlmostEqual(OSME,-0.7743802720529458))
   {
     isOk = false;
-    CONSOLE_LOG("FAIL: output sum margin of error", OSME);
+    console::log("FAIL: output sum margin of error", OSME);
   }
 
   auto DOS = NN::getDeltaOutputSum(NTE(OUT->neurons[0]), OSME);
   if (!isFloatAlmostEqual(DOS, -0.13529621033156358))
   {
-    CONSOLE_LOG("FAIL: delta output sum", DOS); // How much sum have to be adjusted
+    console::log("FAIL: delta output sum", DOS); // How much sum have to be adjusted
   }
 
   auto &pOut = NTE(OUT->neurons[0])->inputs; // Pre-output layer (L1)
   auto DWS = NN::getDeltaWeights(NTE(OUT->neurons[0]), DOS);
 
+  //console::log("INFO: delta weights", DWS);
+
   if (!isFloatListAlmostEqual(DWS, std::vector<double> { -0.1850689045809531, -0.1721687291239315, -0.19608871636883077 }))
   {
-    CONSOLE_LOG("FAIL: delta weights", DWS); // How much w of prev neurons have to be adjusted
+    console::log("FAIL: delta weights", DWS); // How much w of prev neurons have to be adjusted
   }
 
   NTE(OUT->neurons[0])->initNewWeights();
@@ -141,7 +177,7 @@ static bool doUnitTest1()
 
   if (!isFloatListAlmostEqual(NWS, std::vector<double> { 0.11493109541904689, 0.3278312708760685, 0.7039112836311693 }))
   {
-    CONSOLE_LOG("FAIL: new weights", NWS); // New w of output
+    console::log("FAIL: new weights", NWS); // New w of output
   }
 
   // calclulate how to change outputs of prev layer (DOS for each neuton of prev layer)
@@ -151,7 +187,7 @@ static bool doUnitTest1()
 
   if (!isFloatListAlmostEqual(DHS, std::vector<double> { -0.08866949824511623, -0.045540261294143396, -0.032156856991522986 }))
   {
-    CONSOLE_LOG("FAIL: delta hidden sums", DHS); // array of DOS for prev layer
+    console::log("FAIL: delta hidden sums", DHS); // array of DOS for prev layer
   }
 
   // Proc the hidden layer
@@ -169,21 +205,25 @@ static bool doUnitTest1()
 
   if (!isFloatListAlmostEqual(DHS, std::vector<double> { -0.08866949824511623, -0.045540261294143396, -0.032156856991522986 }))
   {
-    CONSOLE_LOG("FAIL: delta hidden sums", DHS); // array of DOS for prev layer
+    console::log("FAIL: delta hidden sums", DHS); // array of DOS for prev layer
   }
+
+  //console::log("INFO: delta weights L1", DWSL1);
 
   if (!isFloatListAlmostEqual(DWSL1[0], std::vector<double> {-0.08866949824511623 , -0.08866949824511623 }) ||
       !isFloatListAlmostEqual(DWSL1[1], std::vector<double> {-0.045540261294143396, -0.045540261294143396}) ||
       !isFloatListAlmostEqual(DWSL1[2], std::vector<double> {-0.032156856991522986, -0.032156856991522986}))
   {
-    CONSOLE_LOG("FAIL: delta weights L1", [DWSL1]); // array of DOS for prev layer
+    console::log("FAIL: delta weights L1", DWSL1); // [] array of DOS for prev layer
   }
+
+  //console::log("INFO: new weights L1", NWSL1);
 
   if (!isFloatListAlmostEqual(NWSL1[0], std::vector<double> {0.7113305017548838, 0.11133050175488378}) ||
       !isFloatListAlmostEqual(NWSL1[1], std::vector<double> {0.3544597387058566, 0.8544597387058567 }) ||
       !isFloatListAlmostEqual(NWSL1[2], std::vector<double> {0.267843143008477 , 0.467843143008477  }))
   {
-    CONSOLE_LOG("FAIL: new weights L1", [NWSL1]); // array of NW for prev layer
+    console::log("FAIL: new weights L1", NWSL1); // [] array of NW for prev layer
   }
 
   // assign
@@ -200,12 +240,72 @@ static bool doUnitTest1()
   if (!isFloatAlmostEqual(CALC2,0.6917258326007417))
   {
     isOk = false;
-    CONSOLE_LOG("FAIL: Result after adjust", CALC2); // should be 0.6917258326007417
+    console::log("FAIL: Result after adjust", CALC2); // should be 0.6917258326007417
   }
 
   NN::DIV_IN_TRAIN = ODT;
 
   return isOk;
+}
+
+} }
+
+// Test case(s) [PRNG]
+// ----------------------------------------------------
+#include <prng.hpp>
+
+namespace NN { namespace Test {
+
+static bool doUnitTestRNG0()
+{
+  bool isOk = true;
+  uint32_t i = 0;
+  int32_t r;
+  Random TRNG(1);
+  while (isOk)
+  {
+    i++;
+    r = TRNG.next();
+
+    if (i == 1) { isOk = (16807 == r); }
+    if (i == 2) { isOk = (282475249 == r); }
+    if (i == 3) { isOk = (1622650073 == r); }
+    if (i == 4) { isOk = (984943658 == r); }
+    if (i == 5) { isOk = (1144108930 == r); }
+    if (i == 6) { isOk = (470211272 == r); }
+    if (i == 7) { isOk = (101027544 == r); }
+    if (i == 8) { isOk = (1457850878 == r); }
+    if (i == 9) { isOk = (1458777923 == r); }
+    if (i == 10) { isOk = (2007237709 == r); }
+
+    if (i == 9998) { isOk = (925166085 == r); }
+    if (i == 9999) { isOk = (1484786315 == r); }
+    if (i == 10000) { isOk = (1043618065 == r); }
+    if (i == 10001) { isOk = (1589873406 == r); }
+    if (i == 10002) { isOk = (2010798668 == r); }
+
+    if (i == 1000000) { isOk = (1227283347 == r); }
+    if (i == 2000000) { isOk = (1808217256 == r); }
+    if (i == 3000000) { isOk = (1140279430 == r); }
+    if (i == 4000000) { isOk = (851767375 == r); }
+    if (i == 5000000) { isOk = (1885818104 == r); }
+
+    if (i == 99000000) { isOk = (168075678 == r); }
+    if (i == 100000000) { isOk = (1209575029 == r); }
+    if (i == 101000000) { isOk = (941596188 == r); }
+
+    if (i == 2147483643) { isOk = (1207672015 == r); }
+    if (i == 2147483644) { isOk = (1475608308 == r); }
+    if (i == 2147483645) { isOk = (1407677000 == r); }
+
+    // Starting the sequence again with the original seed
+
+    if (i == 2147483646) { isOk = (1 == TRNG.next()); }
+    if (i == 2147483647) { isOk = (16807 == TRNG.next()); }
+
+    if (i > 2000000) { break; } // if you no not want to wait too long
+  }
+  return(isOk);
 }
 
 static bool doUnitTestRNG1()
@@ -241,36 +341,48 @@ static int32_t getTestRNGCountSeed()
 
 static bool doUnitTestRNG3()
 {
+  auto NAME = STR("RNG3:");
   bool isOk = true;
   Random TRNG(getTestRNGCountSeed());
   double r;
+  int cmin = 0;
   for (int i = 0; i < TEST_RNG_MAX_COUNT; i++)
   {
     r = TRNG.nextFloat();
     if (r < 0) { isOk = false; break; }
-    if (r >= 1.0) { isOk = false; break; }
+    if (r == 0) { cmin++; }
+    if (r >= 1.0) { isOk = false; break; } // 1.0 not inclusive
   }
-  if (!isOk) { CONSOLE_LOG("FAIL", r); }
+  //if (isOk) { if (cmin <= 0) { console::log(NAME+"WARN: no min found"); } }
+  if (!isOk) { console::log(NAME+"FAIL", r); }
   return(isOk);
 }
 
 static bool doUnitTestRNG4()
 {
+  auto NAME = STR("RNG4:");
   bool isOk = true;
   Random TRNG(getTestRNGCountSeed());
   double r;
+  int cmin = 0;
+  int cmax = 0;
   for (int i = 0; i < TEST_RNG_MAX_COUNT; i++)
   {
     r = TRNG.randFloat();
     if (r < 0) { isOk = false; break; }
+    if (r == 0) { cmin++; }
     if (r > 1.0) { isOk = false; break; }
+    if (r == 1.0) { cmax++; }
   }
-  if (!isOk) { CONSOLE_LOG("FAIL", r); }
+  //if (isOk) { if (cmax <= 0) { console::log(NAME+"WARN: no max found"); } }
+  //if (isOk) { if (cmin <= 0) { console::log(NAME+"WARN: no min found"); } }
+  if (!isOk) { console::log(NAME+"FAIL", r); }
   return(isOk);
 }
 
 static bool doUnitTestRNG5()
 {
+  auto NAME = STR("RNG5:");
   bool isOk = true;
   Random TRNG(getTestRNGCountSeed());
   double r;
@@ -283,13 +395,14 @@ static bool doUnitTestRNG5()
     if (r > TMAX) { isOk = false; break; }
     if (r == TMAX) { cmax++; }
   }
-  if (!isOk) { CONSOLE_LOG("FAIL", r); }
-  //if (isOk) { if (cmax <= 0) { isOk = false; CONSOLE_LOG("FAIL: no max found"); } }
+  //if (isOk) { if (cmax <= 0) { console::log(NAME+"WARN: no max found"); } }
+  if (!isOk) { console::log(NAME+"FAIL", r); }
   return(isOk);
 }
 
 static bool doUnitTestRNG6()
 {
+  auto NAME = STR("RNG6:");
   bool isOk = true;
   Random TRNG(getTestRNGCountSeed());
   double r;
@@ -305,12 +418,18 @@ static bool doUnitTestRNG6()
     if (r == TMIN) { cmin++; }
     if (r == TMAX) { cmax++; }
   }
-  if (!isOk) { CONSOLE_LOG("FAIL", r); }
-  //if (isOk) { if (cmax <= 0) { isOk = false; CONSOLE_LOG("FAIL: no max found"); } }
-  //if (isOk) { if (cmin <= 0) { isOk = false; CONSOLE_LOG("FAIL: no min found"); } }
+  //if (isOk) { if (cmax <= 0) { console::log(NAME+"WARN: no max found"); } }
+  //if (isOk) { if (cmin <= 0) { console::log(NAME+"WARN: no min found"); } }
+  if (!isOk) { console::log(NAME+"FAIL", r); }
   return(isOk);
 }
 
+} }
+
+// Runner
+// ----------------------------------------------------
+
+namespace NN { namespace Test {
 
 //extern
 bool runUnitTests()
@@ -318,7 +437,8 @@ bool runUnitTests()
   std::vector<std::function<bool()>> TESTS 
   {
     &doUnitTest1, 
-    &doUnitTestRNG1, 
+    &doUnitTestRNG0,
+    &doUnitTestRNG1,
     &doUnitTestRNG2, 
     &doUnitTestRNG3, 
     &doUnitTestRNG4, 
@@ -334,17 +454,17 @@ bool runUnitTests()
     if (!test())
     {
       failed++;
-      CONSOLE_LOG("UNIT "+i+" failed");
+      console::log("UNIT "+STR(i)+" failed");
     }
   }
 
   if (failed == 0)
   {
-    CONSOLE_LOG("UNIT TESTS OK "+count+"");
+    console::log("UNIT TESTS OK "+STR(count)+"");
   }
   else
   {
-    CONSOLE_LOG("UNIT TESTS FAILED "+failed+" of "+count+"");
+    console::log("UNIT TESTS FAILED "+STR(failed)+" of "+STR(count)+"");
   }
 
   return(failed == 0);
