@@ -5,13 +5,23 @@
 #include "nnjs_xor_sample.hpp"
 #include <nnjs.hpp>
 
-#include <iostream>
+#include "nnjs_console.hpp"
+#include "nnjs_console_training_stat.hpp"
+
+#include <ctime>
 
 namespace NN { namespace Demo {
 
 //extern
 bool sampleXorNetwork()
 {
+  if (true)
+  {
+    auto seed = time(NULL) % 0x7FFF0000 + 1;
+    NN::Internal::PRNG.setSeed(seed);
+    console::log("sampleOcrNetwork", "seed=", seed);
+  }
+
   auto IN  = new NN::Layer(2, NN::TheNeuronFactory<NN::InputNeuron>{}); IN->addNeuron(new NN::BiasNeuron());
   auto L1  = new NN::Layer(2, NN::TheNeuronFactory<NN::ProcNeuronTrainee>{}); L1->addNeuron(new NN::BiasNeuron());
   L1->addInputAll(IN);
@@ -24,13 +34,20 @@ bool sampleXorNetwork()
   std::vector<std::vector<double>> DATAS{ std::vector<double>{ 1, 1 }, std::vector<double>{ 1, 0 }, std::vector<double>{ 0, 1 }, std::vector<double>{ 0, 0 } }; // = [ [1, 1], [1, 0], [0, 1], [0, 0]];
   std::vector<std::vector<double>> TARGS{                       { 0 },                       { 1 },                       { 1 },                       { 0 } }; // = [    [0],    [1],    [1],    [0]];
 
-  auto result = NN::doTrain(NET, DATAS, TARGS);
+  auto result = NN::doTrain(NET, DATAS, TARGS, -1, -1, &NN::TrainingProgressReporterConsole(1000));
 
   return(result);
 }
 
 bool sampleXorNetwork2()
 {
+  if (true)
+  {
+    auto seed = time(NULL) % 0x7FFF0000 + 1;
+    NN::Internal::PRNG.setSeed(seed);
+    console::log("sampleOcrNetwork2", "seed=", seed);
+  }
+
   auto IN  = new NN::Layer(2, NN::TheNeuronFactory<NN::InputNeuron>{}); IN->addNeuron(new NN::BiasNeuron());
   auto L1  = new NN::Layer(3, NN::TheNeuronFactory<NN::ProcNeuronTrainee>{}); L1->addNeuron(new NN::BiasNeuron());
   L1->addInputAll(IN);
@@ -45,7 +62,7 @@ bool sampleXorNetwork2()
   std::vector<std::vector<double>> DATAS{ std::vector<double>{ 1, 1 }, std::vector<double>{ 1, 0 }, std::vector<double>{ 0, 1 }, std::vector<double>{ 0, 0 } }; // = [ [1, 1], [1, 0], [0, 1], [0, 0]];
   std::vector<std::vector<double>> TARGS{                       { 0 },                       { 1 },                       { 1 },                       { 0 } }; // = [    [0],    [1],    [1],    [0]];
 
-  auto result = NN::doTrain(NET, DATAS, TARGS);
+  auto result = NN::doTrain(NET, DATAS, TARGS, -1, -1, &NN::TrainingProgressReporterConsole(1000));
 
   return(result);
 }

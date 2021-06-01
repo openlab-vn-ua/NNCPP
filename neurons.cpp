@@ -6,6 +6,7 @@
 
 #include <nnjs_unit_test.hpp>
 #include <nnjs_xor_sample.hpp>
+#include <nnjs_ocr_sample.hpp>
 
 #include <iostream>
 
@@ -27,6 +28,9 @@ int main()
 
   isOk = NN::Demo::sampleXorNetwork2();
   std::cout << "XOR2 Training result:" << (isOk ? "OK" : "FAIL") << "\n";
+
+  isOk = NN::Demo::sampleOcrNetwork();
+  std::cout << "OCR Training result:" << (isOk ? "OK" : "FAIL") << "\n";
 
   return 0;
 }

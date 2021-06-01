@@ -18,7 +18,7 @@ namespace NN {
 
 // Public constants / params
 
-// Use "/" instaed of * during train. Used in unit tests only, should be false on production
+// Use "/" instead of * during train. Used in unit tests only, should be false on production
 extern bool DIV_IN_TRAIN;
 
 // Tools
@@ -46,6 +46,13 @@ inline int32_t getRandomInt (int32_t limit)
   return getRandomInt (0, limit);
 }
 
+class NonAssignable // derive from this to prevent copy of move
+{
+  private: NonAssignable(NonAssignable const&) { }
+  private: NonAssignable& operator=(NonAssignable const&) { }
+  public:  NonAssignable() {}
+};
+
 } // Internal
 
 using namespace NN::Internal;
@@ -63,17 +70,19 @@ inline double SD(double x) //S derivative AKA S' AKA dS/dX
   return(std::exp(x)/std::pow(1.0+std::exp(x),2));
 }
 
-// ProcNeuron types
+// Neuron types
 
-// ProcNeuron have to have following functions:
-// // Proc                                                        Input             Normal             Bias  
+// Neuron have to have following functions:
+// // Base                                                        Input             Normal             Bias  
 // .get()                        - to provide its current result  value of .set     result of .proc    1.0
 // .proc()                       - to proccess data on its input  [ignored]         do proc inp links  [ignored]
+// // Input
 // .set(inp)                     - to assing input value          assing inp value  [N/A]              [N/A]
+// // Proc
 // .inputs[] (used for train)    - current input Neurons links    [N/A]             [input link count] [] // empty
 // .w[]      (used for train)    - current input Neurons weights  [N/A]             [input link count] [] // empty
 // // Construction
-// .addInput(ProcNeuron,weight)      - add input link to ProcNeuron       [N/A]             add input link     [ignored]
+// .addInput(Neuron,weight)      - add input link to Neuron       [N/A]             add input link     [ignored]
 // .addInputAll(Neurons,weights) - add input link to Neurons      [N/A]             add input links    [ignored]
 // // Train
 // .getSum()                     - raw sum of all inputs before S [N/A]             sum of .proc       1.0
@@ -82,7 +91,7 @@ inline double SD(double x) //S derivative AKA S' AKA dS/dX
 // .addNewWeightsDelta(DW)       - adds DW to new  weights (.nw)  [N/A]             add dw to .nw      [ignored]
 // .applyNewWeights()            - adds DW to new  weights (.nw)  [N/A]             copy .nw to .w     [ignored]
 
-class BaseNeuron
+class BaseNeuron : protected NonAssignable
 {
   // Returns "state" value that neuron currently "holds" (state updated by proc() function)
   public: virtual double get() = 0; // abstract
@@ -92,6 +101,9 @@ class BaseNeuron
 
   public: virtual ~BaseNeuron() { }
 };
+
+// InputNeuron
+// Always return set value as its output
 
 class InputNeuron : public BaseNeuron
 {
@@ -113,6 +125,9 @@ inline double getRandomInitWeight()
 {
   return(getRandom(-1, 1));
 }
+
+// Proc Neuron
+// Neuron that proccess its input inside proc method
 
 class ProcNeuron : public BaseNeuron
 {
@@ -192,6 +207,9 @@ class ProcNeuron : public BaseNeuron
      addInputAll(neurons, dummy_empty_weights);
   }
 
+  // Core proccsing
+  // Computes output based on input
+
   public: virtual void proc() override
   {
     assert(this->inputs.size() == this->w.size());
@@ -219,6 +237,8 @@ class ProcNeuronTrainee : public ProcNeuron
   // ProcNeurons extension used for training
 
   public:    std::vector<double> nw;  // for train
+
+  // for train
 
   public: double getSum()
   {
@@ -253,12 +273,17 @@ class ProcNeuronTrainee : public ProcNeuron
     }
   }
 
+  // Replace current weights with new weights
+
   public: void applyNewWeights()
   {
     //this->w.assign(this->nw.begin(), this->nw.end());
     this->w = this->nw;
   }
 };
+
+// BiasNeuron
+// Always return 1.0 as its output
 
 class BiasNeuron : public BaseNeuron
 {
@@ -281,10 +306,12 @@ class TheNeuronFactory : public NeuronFactory
   public: virtual BaseNeuron *makeNeuron() override { return new T(); };
 };
 
+/// Layer
+/// Represent a layer of network
 /// This class composes neuron network layer and acts as container for neurons
-/// Layer Container "owns" ProcNeuron(s)
+/// Layer Container "owns" Neuron(s)
 
-class Layer
+class Layer : protected NonAssignable
 {
   public: std::vector<BaseNeuron*> neurons;
 
@@ -361,22 +388,24 @@ inline void doProcNet(std::vector<Layer*> &layers)
 {
   // potential optimization:
   // we may start from layer 1 (not 0) to skip input layer [on input/bias neurons proc func is empty]
-  // but we will start from 0 because we want support "subnet" case here
-  int layersCount = layers.size();
-  for (int i = 0; i < layersCount; i++)
+  // but we will start from 0 because we want support "subnet" case here in future
+  // start from 1 to skip input layer
+  auto layersCount = layers.size();
+  for (size_t i = 1; i < layersCount; i++)
   {
-    int neuronsCount = layers[i]->neurons.size();
-    for (int ii = 0; ii < neuronsCount; ii++)
+    auto neuronsCount = layers[i]->neurons.size();
+    for (size_t ii = 0; ii < neuronsCount; ii++)
     {
       layers[i]->neurons[ii]->proc();
     }
   }
 }
 
+/// Network
 /// This class composes multiple neuron network layers and acts as container for layers
 /// Network Container "owns" Layer(s)
 
-class Network
+class Network : protected NonAssignable
 {
   public: std::vector<Layer*> layers;
 
@@ -396,6 +425,10 @@ class Network
     return(layer);
   }
 };
+
+// Assign inputs
+// The inputs assigned to first layer of the network
+// inputs should be same saze as first (input) layer
 
 inline void doProcAssignInput(Network &NET, const std::vector<double> &inputs)
 {
@@ -432,7 +465,10 @@ inline void doProcAssignInput(Network &NET, const std::vector<double> &inputs)
   }
 }
 
-inline std::vector<double> doProcGetResult(Network &NET)
+// Get network output result
+// resturns array of network's output
+
+inline std::vector<double> doProcGetResult(const Network &NET)
 {
   std::vector<double> result;
 
@@ -474,17 +510,16 @@ inline double getDeltaOutputSum(ProcNeuronTrainee *outNeuron, double OSME) // OS
 
 inline std::vector<double> getDeltaWeights(ProcNeuronTrainee *theNeuron, double DOS) // theNeuron in question, DOS = delta output sum
 {
-  std::vector<double> DWS;
-
-  if (theNeuron == NULL) { return DWS; } // Empty
-
-  double dw;
+  if (theNeuron == NULL) { return std::vector<double>(); } // Empty
 
   size_t count = theNeuron->inputs.size();
+  std::vector<double> DWS(count); // reserve capacity, so we do not need push_back
+
+  double dw;
   for (size_t i = 0; i < count; i++)
   {
     if (DIV_IN_TRAIN) { dw = DOS / theNeuron->inputs[i]->get(); } else { dw = DOS * theNeuron->inputs[i]->get(); }
-    DWS.push_back(dw);
+    DWS[i] = dw; // DWS.push_back(dw);
   }
 
   return(DWS);
@@ -492,13 +527,12 @@ inline std::vector<double> getDeltaWeights(ProcNeuronTrainee *theNeuron, double 
 
 inline std::vector<double> getDeltaHiddenSums(ProcNeuronTrainee *theNeuron, double DOS) // theNeuron in question, DOS = delta output sum
 {
-  std::vector<double> DHS;
-
-  if (theNeuron == NULL) { return DHS; } // Empty
-
-  double ds;
+  if (theNeuron == NULL) { return std::vector<double>(); } // Empty
 
   size_t count = theNeuron->inputs.size();
+  std::vector<double> DHS(count); // reserve capacity, so we do not need push_back
+
+  double ds;
   for (size_t i = 0; i < count; i++)
   {
     auto input = dynamic_cast<ProcNeuronTrainee*>(theNeuron->inputs[i]);
@@ -506,18 +540,20 @@ inline std::vector<double> getDeltaHiddenSums(ProcNeuronTrainee *theNeuron, doub
     {
       ds = NAN; // This neuron input is non-trainee neuron, ds is N/A since we do not know its getSum()
     }
-    else // look like SD here is SD for input neuron (?) use input->SD(input->getSum()) later
+    else // looks like SD here is SD for input neuron (?) use input->SD(input->getSum()) later
     {
       if (DIV_IN_TRAIN) { ds = DOS / theNeuron->w[i] * SD(input->getSum()); } else { ds = DOS * theNeuron->w[i] * SD(input->getSum()); }
     }
 
-    DHS.push_back(ds);
+    DHS[i] = ds; // DHS.push_back(ds);
   }
 
   return(DHS);
 }
 
-// Train function
+// Train functions
+// -----------------------------------------------
+// Do network train
 
 inline void doTrainStepProcPrevLayer(std::vector<BaseNeuron*> &LOUT, std::vector<double> &DOS, int layerIndex)
 {
@@ -537,28 +573,26 @@ inline void doTrainStepProcPrevLayer(std::vector<BaseNeuron*> &LOUT, std::vector
   {
     auto neuron = dynamic_cast<ProcNeuronTrainee *>(LOUT[i]);
 
-    if (neuron != NULL)
+    if (neuron == NULL) { break; } // Non-trainable neuron
+
+    auto &LP = neuron->inputs;
+    auto DOHS = getDeltaHiddenSums(neuron, DOS[i]);
+
+    assert(LP.size() == DOHS.size());
+
+    for (size_t ii = 0; ii < LP.size(); ii++)
     {
-      auto &LP = neuron->inputs;
-
-      auto DOHS = getDeltaHiddenSums(neuron, DOS[i]);
-
-      assert(LP.size() == DOHS.size());
-
-      for (size_t ii = 0; ii < LP.size(); ii++)
+      auto input = dynamic_cast<ProcNeuronTrainee *>(LP[ii]);
+      if (input != NULL)
       {
-        auto input = dynamic_cast<ProcNeuronTrainee *>(LP[ii]);
-        if (input != NULL)
-        {
-          auto DW = getDeltaWeights(input, DOHS[ii]);
-          input->addNewWeightsDelta(DW);
-        }
+        auto DW = getDeltaWeights(input, DOHS[ii]);
+        input->addNewWeightsDelta(DW);
       }
-
-      doTrainStepProcPrevLayer(LP, DOHS, layerIndex-1);
     }
+
+    doTrainStepProcPrevLayer(LP, DOHS, layerIndex-1);
   }
-};
+}
 
 inline void doTrainStep(Network &NET, const std::vector<double> &DATA, const std::vector<double> &TARG, double SPEED)
 {
@@ -566,14 +600,14 @@ inline void doTrainStep(Network &NET, const std::vector<double> &DATA, const std
   // CALC=calculated output (will be calculated)
   // Note: we re-run calculation here both to receive CALC AND update "sum" state of each neuron in NET
 
-  if (std::isnan(SPEED) ||  SPEED <= 0.0) { SPEED = 1.0; } // 0.1???
+  if (std::isnan(SPEED) ||  (SPEED <= 0.0)) { SPEED = 0.1; } // 1.0 is max
 
   auto CALC = doProc(NET, DATA); // we need this because sum has to be updated in NET for each neuron for THIS test case
 
   for (size_t i = 1; i < NET.layers.size(); i++) // skip input layer
   {
-    int iicount = NET.layers[i]->neurons.size();
-    for (int ii = 0; ii < iicount; ii++)
+    auto iicount = NET.layers[i]->neurons.size();
+    for (size_t ii = 0; ii < iicount; ii++)
     {
       auto neuron = dynamic_cast<ProcNeuronTrainee *>(NET.layers[i]->neurons[ii]);
       if (neuron != NULL)
@@ -591,6 +625,8 @@ inline void doTrainStep(Network &NET, const std::vector<double> &DATA, const std
   std::vector<double> DOS ; // delta output sum for each output neuron
   std::vector<std::vector<double>> DOIW; // delta output neuron input weights each output neuron
 
+  // proc output layer
+
   for (size_t i = 0; i < LOUT.size(); i++)
   {
     auto neuron = dynamic_cast<ProcNeuronTrainee *>(LOUT[i]);
@@ -604,13 +640,15 @@ inline void doTrainStep(Network &NET, const std::vector<double> &DATA, const std
   }
 
   // proc prev layers
+  // will apply training back recursively
+  // recursion controlled by laterIndex
 
   doTrainStepProcPrevLayer(LOUT, DOS, NET.layers.size()-1);
 
   for (size_t i = 1; i < NET.layers.size(); i++) // skip input layer
   {
-    int iicount = NET.layers[i]->neurons.size();
-    for (int ii = 0; ii < iicount; ii++)
+    auto iicount = NET.layers[i]->neurons.size();
+    for (size_t ii = 0; ii < iicount; ii++)
     {
       auto neuron = dynamic_cast<ProcNeuronTrainee *>(NET.layers[i]->neurons[ii]);
       if (neuron != NULL)
@@ -621,62 +659,53 @@ inline void doTrainStep(Network &NET, const std::vector<double> &DATA, const std
   }
 }
 
-class BaseTraningResutChecker
+/// Class checker for training is done
+
+class TrainingDoneChecker
 {
-  // Function checks if training is done
-  // DATAS is a list of source data sets
-  // TARGS is a list of target data sets
-  // CALCS is a list of result data sets
-  public: virtual bool isTraningDone(const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, const std::vector<std::vector<double>> &CALCS) = 0;
+  /// Function checks if training is done
+  /// DATAS is a list of source data sets
+  /// TARGS is a list of target data sets
+  /// CALCS is a list of result data sets
+  public: virtual bool isTrainingDone(const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, const std::vector<std::vector<double>> &CALCS) = 0;
 };
 
 const double DEFAULT_EPS = 0.1;
 
-inline bool isResultMatchSimpleFunc(const std::vector<double> &TARG, const std::vector<double> &CALC, double eps = NAN)
-{
-  if (std::isnan(eps) || eps <= 0.0) { eps = DEFAULT_EPS; } // > 0.0 and < 0.5 // just in case
-
-  auto isResultItemMatch = [eps](double t, double c)
-  {
-    if (std::abs(t-c) < eps) { return(true); }
-    return(false);
-  };
-
-  assert(TARG.size() == CALC.size());
-
-  for (size_t ii = 0; ii < TARG.size(); ii++)
-  {
-    if (!isResultItemMatch(TARG[ii], CALC[ii]))
-    {
-      return(false);
-    }
-  }
-
-  return(true);
-}
-
-class EpsTraningResutChecker : public BaseTraningResutChecker
+class TrainingDoneCheckerEps : public TrainingDoneChecker
 {
   protected: double eps = DEFAULT_EPS;
 
-  public: EpsTraningResutChecker()
+  // Constructor
+
+  public: TrainingDoneCheckerEps()
   {
     this->eps = DEFAULT_EPS;
   }
 
-  public: EpsTraningResutChecker(double eps)
+  public: TrainingDoneCheckerEps(double eps)
   {
-    if (std::isnan(eps) || eps <= 0.0) { eps = DEFAULT_EPS; } // > 0.0 and < 0.5
+    if (std::isnan(eps) || (eps <= 0.0)) { eps = DEFAULT_EPS; } // > 0.0 and < 0.5
     this->eps = eps;
   }
 
-  public: bool isTraningDone(const std::vector<std::vector<double>> &TARGS, const std::vector<std::vector<double>> &CALCS)
-  {
-    assert(TARGS.size() == CALCS.size());
+  // simple single vectors match
 
-    for (size_t s = 0; s < TARGS.size(); s++)
+  public: static bool isResultSampleMatch(const std::vector<double>& TARG, const std::vector<double>& CALC, double eps = NAN)
+  {
+    if (std::isnan(eps) || eps <= 0.0) { eps = DEFAULT_EPS; } // > 0.0 and < 0.5 // just in case
+
+    auto isResultItemMatch = [eps](double t, double c)
     {
-      if (!isResultMatchSimpleFunc(TARGS[s], CALCS[s], this->eps))
+      if (std::abs(t-c) < eps) { return(true); }
+      return(false);
+    };
+
+    assert(TARG.size() == CALC.size());
+
+    for (size_t ii = 0; ii < TARG.size(); ii++)
+    {
+      if (!isResultItemMatch(TARG[ii], CALC[ii]))
       {
         return(false);
       }
@@ -685,17 +714,77 @@ class EpsTraningResutChecker : public BaseTraningResutChecker
     return(true);
   }
 
-  public: virtual bool isTraningDone(const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, const std::vector<std::vector<double>> &CALCS)
+  public: static double getResultSampleVarianceSum(const std::vector<double>& TARG, const std::vector<double>& CALC)
+  {
+    assert(TARG.size() == CALC.size());
+
+    double result = 0;
+
+    for (size_t ii = 0; ii < TARG.size(); ii++)
+    {
+      double diff = TARG[ii] - CALC[ii];
+
+      result += diff * diff;
+    }
+
+    return(result);
+  }
+
+  public: static double getResultSetVarianceSum(const std::vector<std::vector<double>>& TARGS, const std::vector<std::vector<double>>& CALCS)
+  {
+    assert(TARGS.size() == CALCS.size());
+
+    double result = 0;
+
+    for (size_t s = 0; s < TARGS.size(); s++)
+    {
+      result += getResultSampleVarianceSum(TARGS[s], CALCS[s]);
+    }
+
+    return(result);
+  }
+
+  public: static double getResultSetVariance(const std::vector<std::vector<double>>& TARGS, const std::vector<std::vector<double>>& CALCS)
+  {
+    double result = getResultSetVarianceSum(TARGS, CALCS);
+    long count = TARGS.size();
+    if (count > 0) { count *= TARGS[0].size(); }
+    if (count <= 0) { return NAN; }
+    return(result / count);
+  }
+
+  public: static bool isTrainingDoneSimple(const std::vector<std::vector<double>> &TARGS, const std::vector<std::vector<double>> &CALCS, double eps)
+  {
+    assert(TARGS.size() == CALCS.size());
+
+    for (size_t s = 0; s < TARGS.size(); s++)
+    {
+      if (!isResultSampleMatch(TARGS[s], CALCS[s], eps))
+      {
+        return(false);
+      }
+    }
+
+    return(true);
+  }
+
+  public: virtual bool isTrainingDone(const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, const std::vector<std::vector<double>> &CALCS)
   override
   {
     assert(DATAS.size() == TARGS.size());
     assert(TARGS.size() == CALCS.size());
-    return(isTraningDone(TARGS, CALCS));
+    return(isTrainingDoneSimple(TARGS, CALCS, eps));
   }
 };
 
-class TrainProgress
+/// Training progress reporter
+/// Will be called during traing to report progress
+/// May rise traing abort event
+
+class TrainingProgressReporter
 {
+  // TrainingArgs parameter
+
   public: class TrainingArgs
   {
     public:
@@ -711,6 +800,9 @@ class TrainProgress
     }
   };
 
+  // TrainingStep parameter
+  // for onTrainingStep
+
   public: class TrainingStep
   {
     public:
@@ -723,27 +815,33 @@ class TrainProgress
     }
   };
 
+  // Report methods
+
   public: virtual void onTrainingBegin(TrainingArgs *args) { }
   public: virtual bool onTrainingStep (TrainingArgs *args, TrainingStep *step) { return true; } // return false to abort training
   public: virtual void onTrainingEnd  (TrainingArgs *args, bool isOk) { }
 };
 
+// Main training function
+
 const int    DEFAULT_TRAIN_COUNT    = 50000;
 const double DEFAULT_TRAINING_SPEED = 0.125;
 
-inline bool doTrain(Network &NET, const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, double SPEED = -1, int MAX_N = -1, TrainProgress *progressReporter = NULL, BaseTraningResutChecker *isTrainDoneFunc = NULL)
+/// Train the neural network
+inline bool doTrain(Network &NET, const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, double SPEED = -1, int MAX_N = -1, TrainingProgressReporter *progressReporter = NULL, TrainingDoneChecker *isTrainingDoneChecker = NULL)
 {
   if (MAX_N < 0)       { MAX_N = DEFAULT_TRAIN_COUNT; }
   if (SPEED < 0)       { SPEED = DEFAULT_TRAINING_SPEED; }
 
-  EpsTraningResutChecker isTrainDoneDefaultFunc;
+  TrainingDoneCheckerEps isTrainingDoneCheckerDefault;
 
-  if (isTrainDoneFunc == NULL) { isTrainDoneFunc = &isTrainDoneDefaultFunc; }
+  if (isTrainingDoneChecker == NULL) { isTrainingDoneChecker = &isTrainingDoneCheckerDefault; }
 
-  TrainProgress::TrainingArgs trainArgs(NET, DATAS, TARGS, SPEED, MAX_N);
+  TrainingProgressReporter::TrainingArgs trainArgs(NET, DATAS, TARGS, SPEED, MAX_N);
 
   if (progressReporter != NULL) { progressReporter->onTrainingBegin(&trainArgs); }
 
+  // steps
   bool isDone = false;
   for (int n = 0; (n < MAX_N) && (!isDone); n++)
   {
@@ -755,7 +853,7 @@ inline bool doTrain(Network &NET, const std::vector<std::vector<double>> &DATAS,
 
     if (progressReporter != NULL)
     {
-      TrainProgress::TrainingStep step(CALCS, n);
+      TrainingProgressReporter::TrainingStep step(CALCS, n);
 
       if (!progressReporter->onTrainingStep(&trainArgs, &step))
       {
@@ -765,7 +863,7 @@ inline bool doTrain(Network &NET, const std::vector<std::vector<double>> &DATAS,
       }
     }
 
-    isDone = isTrainDoneFunc->isTraningDone(DATAS, TARGS, CALCS);
+    isDone = isTrainingDoneChecker->isTrainingDone(DATAS, TARGS, CALCS);
 
     if (!isDone)
     {
@@ -784,35 +882,45 @@ inline bool doTrain(Network &NET, const std::vector<std::vector<double>> &DATAS,
   return(isDone);
 }
 
-// Some internals
-
 /*
-NCore.Internal = {};
-NCore.Internal.PRNG = PRNG;
-NCore.Internal.getRandom = getRandom;
-NCore.Internal.getRandomInt = getRandomInt;
-NCore.Internal.getDeltaOutputSum  = getDeltaOutputSum;
-NCore.Internal.getDeltaWeights    = getDeltaWeights;
-NCore.Internal.getDeltaHiddenSums = getDeltaHiddenSums;
-
 // Exports
 
-NCore.ProcNeuron = ProcNeuron;
-NCore.InputNeuron = InputNeuron;
-NCore.BiasNeuron = BiasNeuron;
+// Some internals
 
-NCore.Layer   = Layer;
+NN.Internal = {};
+NN.Internal.PRNG = PRNG;
+NN.Internal.getRandom = getRandom;
+NN.Internal.getRandomInt = getRandomInt;
+NN.Internal.getDeltaOutputSum  = getDeltaOutputSum;
+NN.Internal.getDeltaWeights    = getDeltaWeights;
+NN.Internal.getDeltaHiddenSums = getDeltaHiddenSums;
 
-NCore.doProc  = doProc;
-NCore.doTrain = doTrain;
+// Core
+
+NN.ProcNeuron  = ProcNeuron;
+NN.InputNeuron = InputNeuron;
+NN.BiasNeuron  = BiasNeuron;
+
+NN.Layer       = Layer;
+
+NN.doProc      = doProc;
+
+NN.TrainingDoneChecker = TrainingDoneChecker;
+NN.TrainingDoneCheckerEps = TrainingDoneCheckerEps;
+NN.TrainingProgressReporter = TrainingProgressReporter;
+NN.doTrain = doTrain;
 */
 
 // Aux
 
+inline bool isResultSampleMatchSimpleFunc(const std::vector<double>& TARG, const std::vector<double>& CALC, double eps)
+{
+  return TrainingDoneCheckerEps::isResultSampleMatch(TARG, CALC, eps);
+}
+
 inline bool isResultBatchMatchSimpleFunc(const std::vector<std::vector<double>> &TARGS, const std::vector<std::vector<double>> &CALCS, double eps)
 {
-  EpsTraningResutChecker checker(eps);
-  return(checker.isTraningDone(TARGS, CALCS));
+  return TrainingDoneCheckerEps::isTrainingDoneSimple(TARGS, CALCS, eps);
 }
 
 } // NN

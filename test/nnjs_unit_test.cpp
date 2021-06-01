@@ -8,39 +8,15 @@
 #include <vector>
 #include <functional>
 
-// Console simulator
+// Console
 // ----------------------------------------------------
 
-#include <string>
-#include <sstream>
-#include <iostream>
-
-namespace console {
-
-template<typename T1> std::string toString(const T1& x) { std::stringstream s; s << x; return s.str(); }
-template<typename T1> std::string toString(const std::vector<T1> &x)
-{ 
-  std::stringstream s;
-  int i = 0;
-  s << "[";
-  for (auto& item : x) 
-  { 
-      if (i > 0) { s << ","; } 
-      s << toString(item); 
-      i++; 
-  }
-  s << "]";
-  return s.str(); 
-}
-
-template<typename T1> void log(T1 a1) { std::cout << toString(a1) << "\n"; };
-template<typename T1, typename T2> void log(const T1 &a1, const T2 &a2) { std::cout << toString(a1) << " " << toString(a2) << "\n"; };
-template<typename T1, typename T2, typename T3> void log(const T1 &a1, const T2 &a2, const T3 &a3) { std::cout << toString(a1) << " " << toString(a2) " " << toString(a3) << "\n"; };
-
-}
+#include "nnjs_console.hpp"
 
 // Utils
 // ----------------------------------------------------
+
+#include <string>
 
 namespace NN { namespace Test {
 
