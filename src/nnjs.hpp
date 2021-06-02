@@ -551,6 +551,251 @@ inline std::vector<double> getDeltaHiddenSums(ProcNeuronTrainee *theNeuron, doub
   return(DHS);
 }
 
+// Network Stat and Math functionality
+// -----------------------------------------------
+// Mostly used for train
+
+namespace NetworkStat // static class
+{
+  // MatchEps
+
+  const double DEFAULT_EPS = 0.1;
+
+  inline double isResultItemMatchEps(double t, double c, double eps) // private
+  {
+    //if (std::isnan(eps) || eps <= 0.0) { eps = DEFAULT_EPS; } // > 0.0 and < 0.5
+    if (std::abs(t - c) < eps) { return(true); }
+    return (false);
+  }
+
+  inline bool isResultSampleMatchEps(const std::vector<double> &TARG, const std::vector<double> &CALC, double eps = NAN)
+  {
+    if (std::isnan(eps) || eps <= 0.0) { eps = DEFAULT_EPS; } // > 0.0 and < 0.5
+
+    auto count = TARG.size();
+
+    assert(count == CALC.size());
+
+    for (size_t ii = 0; ii < count; ii++)
+    {
+      if (!isResultItemMatchEps(TARG[ii], CALC[ii], eps))
+      {
+        return(false);
+      }
+    }
+
+    return(true);
+  }
+
+  // MatchArgMax
+
+  inline int getMaximumIndexEps(const std::vector<double> &R, double eps)
+  {
+    // input:  R as vector of floats (usualy 0.0 .. 1.0), eps min comparison difference
+    // result: index of maximum value, checking that next maximum is at least eps lower.
+    // returns -1 if no such value found (maximums too close)
+
+    if (std::isnan(eps) || eps <= 0.0) { eps = DEFAULT_EPS; } // > 0.0 and < 0.5
+
+    int FAIL = -1;
+
+    auto RLen = R.size();
+
+    if (RLen <= 0) { return(FAIL); }
+    if (RLen <= 1) { return(0);    }
+
+    // RLen >= 2
+
+    int currMaxIndex;
+    int prevMaxIndex;
+    if (R[0] > R[1])
+    {
+      currMaxIndex = 0;
+      prevMaxIndex = 1;
+    }
+    else
+    {
+      currMaxIndex = 1;
+      prevMaxIndex = 0;
+    }
+
+    for (size_t i = 2; i < RLen; i++)
+    {
+      if (R[i] > R[currMaxIndex]) { prevMaxIndex = currMaxIndex; currMaxIndex = i; }
+    }
+
+    if (std::isnan(eps))
+    {
+      // reserved for NAN = do not check (not used as for now)
+    }
+    else
+    {
+      if (R[currMaxIndex] < eps)
+      {
+        return(FAIL); // not ever greater than 0, no reason so check another max
+      }
+
+      if (std::abs(R[currMaxIndex] - R[prevMaxIndex]) < eps)
+      {
+        return(FAIL); // maximums too close
+      }
+    }
+
+    return (currMaxIndex);
+  }
+
+  inline int getMaximumIndex(const std::vector<double> &R)
+  {
+    // input:  R as vector of floats (usualy 0.0 .. 1.0)
+    // result: index of maximum value
+    // returns -1 if no such value found (vector is empty)
+
+    int FAIL = -1;
+
+    auto RLen = R.size();
+
+    if (RLen <= 0) { return(FAIL); }
+    if (RLen <= 1) { return(0);    }
+
+    // Rlen >= 2
+
+    int currMaxIndex = 0;
+
+    for (size_t i = 1; i < RLen; i++)
+    {
+      if (R[i] > R[currMaxIndex]) { currMaxIndex = i; }
+    }
+
+    return (currMaxIndex);
+  }
+
+  inline bool isResultSampleMatchArgmaxEps(const std::vector<double> &TARG, const std::vector<double> &CALC, double eps)
+  {
+    if (std::isnan(eps) || eps <= 0.0) { eps = DEFAULT_EPS; } // > 0.0 and < 0.5
+
+    auto maxIndex = getMaximumIndexEps(CALC, eps);
+
+    if (maxIndex < 0) { return(false); }
+
+    auto count = TARG.size();
+
+    assert(count == CALC.size());
+
+    for (size_t ii = 0; ii < count; ii++)
+    {
+      if ((TARG[ii] > 0.0) && (ii != maxIndex))
+      {
+        return(false);
+      }
+      else if ((TARG[ii] <= 0.0) && (ii == maxIndex))
+      {
+        return(false);
+      }
+    }
+
+    return(true);
+  }
+
+  inline bool isResultSampleMatchArgmax(const std::vector<double> &TARG, const std::vector<double> &CALC)
+  {
+    auto maxIndex = getMaximumIndex(CALC);
+
+    if (maxIndex < 0) { return(false); }
+
+    auto count = TARG.size();
+
+    assert(count == CALC.size());
+
+    for (size_t ii = 0; ii < count; ii++)
+    {
+      if ((TARG[ii] > 0.0) && (ii != maxIndex))
+      {
+        return(false);
+      }
+      else if ((TARG[ii] <= 0.0) && (ii == maxIndex))
+      {
+        return(false);
+      }
+    }
+
+    return(true);
+  }
+
+  // Aggregated error
+
+  const double AGG_ERROR_DIVIDED_BY = 2.0; // to be used as error function, should be mutiplied by 1/2 so derivative will not have 2x in front
+
+  inline double getResultSampleAggErrorSum(const std::vector<double> &TARG, const std::vector<double> &CALC)
+  {
+    auto count = TARG.size();
+
+    assert(count == CALC.size());
+
+    double result = 0;
+
+    for (size_t ii = 0; ii < count; ii++)
+    {
+      double diff = TARG[ii] - CALC[ii];
+
+      result += diff * diff;
+    }
+
+    return(result);
+  }
+
+  inline double getResultSetAggErrorSum(const std::vector<std::vector<double>> &TARGS, const std::vector<std::vector<double>> &CALCS)  // private
+  {
+    auto count = TARGS.size();
+
+    assert(count == CALCS.size());
+
+    double result = 0;
+
+    for (size_t s = 0; s < count; s++)
+    {
+      result += getResultSampleAggErrorSum(TARGS[s], CALCS[s]);
+    }
+
+    return(result);
+  }
+
+  inline double getResultSetAggError(const std::vector<std::vector<double>> &TARGS, const std::vector<std::vector<double>> &CALCS)
+  {
+    auto result = getResultSetAggErrorSum(TARGS, CALCS);
+    auto count = TARGS.size();
+    if (count > 0) { count *= TARGS[0].size(); }
+    if (count <= 0) { return NAN; }
+    return(result / count / AGG_ERROR_DIVIDED_BY);
+  }
+
+  inline double getResultSetAggErrorByAggErrorSum(double sum, size_t sampleSize, size_t samplesCount = 1)
+  {
+    auto count = samplesCount;
+    if (count > 0) { count *= sampleSize; }
+    if (count <= 0) { return NAN; }
+    return(sum / count / AGG_ERROR_DIVIDED_BY);
+  }
+
+  // Misc
+
+  inline std::vector<double> getR1Array(int index, int total, double SET = 1, double NOTSET = 0)
+  {
+    // Retuns array with only one index of total item set to SET(=1) and all other as NOTSET(=0): 0=[1, 0, 0 ...], 1=[0, 1, 0, ...], 2=[0, 0, 1, ...]
+
+    // if (SET    == null) { SET    = 1; }
+    // if (NOTSET == null) { NOTSET = 0; }
+
+    std::vector<double> R; // = [];
+
+    for (auto i = 0; i < total; i++)
+    {
+      R.push_back(i == index ? SET : NOTSET);
+    }
+
+    return(R);
+  }
+}
+
 // Train functions
 // -----------------------------------------------
 // Do network train
@@ -691,75 +936,13 @@ class TrainingDoneCheckerEps : public TrainingDoneChecker
 
   // simple single vectors match
 
-  public: static bool isResultSampleMatch(const std::vector<double>& TARG, const std::vector<double>& CALC, double eps = NAN)
-  {
-    if (std::isnan(eps) || eps <= 0.0) { eps = DEFAULT_EPS; } // > 0.0 and < 0.5 // just in case
-
-    auto isResultItemMatch = [eps](double t, double c)
-    {
-      if (std::abs(t-c) < eps) { return(true); }
-      return(false);
-    };
-
-    assert(TARG.size() == CALC.size());
-
-    for (size_t ii = 0; ii < TARG.size(); ii++)
-    {
-      if (!isResultItemMatch(TARG[ii], CALC[ii]))
-      {
-        return(false);
-      }
-    }
-
-    return(true);
-  }
-
-  public: static double getResultSampleVarianceSum(const std::vector<double>& TARG, const std::vector<double>& CALC)
-  {
-    assert(TARG.size() == CALC.size());
-
-    double result = 0;
-
-    for (size_t ii = 0; ii < TARG.size(); ii++)
-    {
-      double diff = TARG[ii] - CALC[ii];
-
-      result += diff * diff;
-    }
-
-    return(result);
-  }
-
-  public: static double getResultSetVarianceSum(const std::vector<std::vector<double>>& TARGS, const std::vector<std::vector<double>>& CALCS)
-  {
-    assert(TARGS.size() == CALCS.size());
-
-    double result = 0;
-
-    for (size_t s = 0; s < TARGS.size(); s++)
-    {
-      result += getResultSampleVarianceSum(TARGS[s], CALCS[s]);
-    }
-
-    return(result);
-  }
-
-  public: static double getResultSetVariance(const std::vector<std::vector<double>>& TARGS, const std::vector<std::vector<double>>& CALCS)
-  {
-    double result = getResultSetVarianceSum(TARGS, CALCS);
-    long count = TARGS.size();
-    if (count > 0) { count *= TARGS[0].size(); }
-    if (count <= 0) { return NAN; }
-    return(result / count);
-  }
-
   public: static bool isTrainingDoneSimple(const std::vector<std::vector<double>> &TARGS, const std::vector<std::vector<double>> &CALCS, double eps)
   {
     assert(TARGS.size() == CALCS.size());
 
     for (size_t s = 0; s < TARGS.size(); s++)
     {
-      if (!isResultSampleMatch(TARGS[s], CALCS[s], eps))
+      if (!NetworkStat::isResultSampleMatchEps(TARGS[s], CALCS[s], eps))
       {
         return(false);
       }
@@ -900,28 +1083,20 @@ NN.Internal.getDeltaHiddenSums = getDeltaHiddenSums;
 NN.ProcNeuron  = ProcNeuron;
 NN.InputNeuron = InputNeuron;
 NN.BiasNeuron  = BiasNeuron;
-
 NN.Layer       = Layer;
-
 NN.doProc      = doProc;
+
+// Math
+
+NN.NetworkStat = NetworkStat;
+
+// Training
 
 NN.TrainingDoneChecker = TrainingDoneChecker;
 NN.TrainingDoneCheckerEps = TrainingDoneCheckerEps;
 NN.TrainingProgressReporter = TrainingProgressReporter;
 NN.doTrain = doTrain;
 */
-
-// Aux
-
-inline bool isResultSampleMatchSimpleFunc(const std::vector<double>& TARG, const std::vector<double>& CALC, double eps)
-{
-  return TrainingDoneCheckerEps::isResultSampleMatch(TARG, CALC, eps);
-}
-
-inline bool isResultBatchMatchSimpleFunc(const std::vector<std::vector<double>> &TARGS, const std::vector<std::vector<double>> &CALCS, double eps)
-{
-  return TrainingDoneCheckerEps::isTrainingDoneSimple(TARGS, CALCS, eps);
-}
 
 } // NN
 

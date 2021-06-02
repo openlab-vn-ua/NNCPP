@@ -312,6 +312,8 @@ std::vector<std::string> sampleAddLetTexts(const std::vector<double> &L, std::ve
 
 bool sampleOcrNetwork()
 {
+  // The Dataset
+
   if (true)
   {
     auto seed = time(NULL) % 0x7FFF0000 + 1;
@@ -320,6 +322,13 @@ bool sampleOcrNetwork()
   }
 
   auto SAMPLES = sampleOcrGetSamples(); // [letter][sample] = data[]
+  std::vector<std::vector<double>> RESULTS; // [letter] = R1 array
+
+  for (size_t dataIndex = 0; dataIndex < SAMPLES.size(); dataIndex++)
+  {
+    auto RESULT = NN::NetworkStat::getR1Array(dataIndex,SAMPLES.size()); // target result for this letter
+    RESULTS.push_back(RESULT);
+  }
 
   // The Net
 
@@ -349,50 +358,29 @@ bool sampleOcrNetwork()
     NET.addLayer(IN); NET.addLayer(L1); NET.addLayer(L2); NET.addLayer(OUT);
   }
 
-  auto getR1Array = [](int index, int total, double SET = 1, double NOTSET = 0) -> std::vector<double>
-  {
-    // if (SET    == null) { SET    = 1; }
-    // if (NOTSET == null) { NOTSET = 0; }
+  // Dataset prepration
 
-    // Retuns array with only one index of total item set to SET(=1) and all other as NOTSET(=0): 0=[1, 0, 0 ...], 1=[0, 1, 0, ...], 2=[0, 0, 1, ...]
-    std::vector<double> R; // = [];
-
-    for (auto i = 0; i < total; i++)
-    {
-      R.push_back(i == index ? SET : NOTSET);
-    }
-
-    return(R);
-  };
+  // SAMPLES // 2D array [letter][sample] = data[]
+  // RESULTS // 1D array [letter] = result[] expected
 
   // Prepare DATAS and TARGS as source and expected results to train
 
-  auto const &INPSS = SAMPLES; // 2D array [letter][sample] = data[]
-  std::vector<std::vector<double>> OUTRS; // 1D array [letter] = result[] expected
-
-  for (size_t dataIndex = 0; dataIndex < INPSS.size(); dataIndex++)
-  {
-    auto OUTR = getR1Array(dataIndex,INPSS.size()); // target result for this letter
-    OUTRS.push_back(OUTR);
-  }
-
   //auto DATASE = [ getLArray(LA0), getLArray(LB0), getLArray(LC0), getLArray(LD0) ];
-  //auto TARGSE = [ getR1Out(0,4),  getR1Out(1,4),  getR1Out(2,4),  getR1Out(3,4) ];
+  //auto TARGSE = [ getR1Out(0,4),  getR1Out(1,4),  getR1Out(2,4),  getR1Out(3,4)  ];
 
   std::vector<std::vector<double>> DATASE; // data source etalon (no noise) : source samples as plain array (inputs)
   std::vector<std::vector<double>> TARGSE; // data target etalon (no noise) : results expected as plain array (outputs)
 
-  for (size_t dataIndex = 0; dataIndex < INPSS.size(); dataIndex++)
+  for (size_t dataIndex = 0; dataIndex < SAMPLES.size(); dataIndex++)
   {
-    auto INPS = INPSS[dataIndex]; // letter samples (may be many)
-    auto OUTR = OUTRS[dataIndex]; // target result for this letter
-
-    for (size_t ii = 0; ii < INPS.size(); ii++)
+    for (size_t ii = 0; ii < SAMPLES[dataIndex].size(); ii++)
     {
-      DATASE.push_back(INPS[ii]);
-      TARGSE.push_back(OUTR); // for all samples of same input result should be the same
+      DATASE.push_back(SAMPLES[dataIndex][ii]);
+      TARGSE.push_back(RESULTS[dataIndex]); // for all samples of same input result should be the same
     }
   }
+
+  // Augmented data (original + shifted)
 
   std::vector<std::vector<double>> DATAS; // work samples (may be noised)
   std::vector<std::vector<double>> TARGS; // work targets (for in noised)
@@ -415,6 +403,12 @@ bool sampleOcrNetwork()
     TARGS.push_back(TARGSE[dataIndex]);
   }
 
+  //auto DATA_AUGMENTATION_MUTIPLIER = DATAS.length / DATASE.length; // there will be 7 DATAS images per 1 source DATASE image
+
+  // Dump dataset before train
+
+  bool DUMP_DATASET = false;
+
   auto dumpSamples = [](const std::vector<std::vector<double>> &DATAS, int imagesPerSample)
   {
     int sampleCount = DATAS.size() / imagesPerSample; // sumber of samples
@@ -434,7 +428,9 @@ bool sampleOcrNetwork()
     }
   };
 
-  dumpSamples(DATAS, DATAS.size() / DATASE.size());
+  if (DUMP_DATASET) { dumpSamples(DATAS, DATAS.size() / DATASE.size()); }
+
+  // Training
 
   console::log("Training, please wait ...");
   if (!NN::doTrain(NET, DATAS, TARGS, -1, -1, &NN::TrainingProgressReporterConsole(10)))
@@ -447,61 +443,10 @@ bool sampleOcrNetwork()
 
   // Verification
 
-  auto getMaximumIndex = [](const std::vector<double>& R, double minDiff) -> int
+  auto verifyProc= [](NN::Network &NET, const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, const char *stepName, int imagesPerSample) -> bool
   {
-    // input:  R as vector of floats (usualy 0.0 .. 1.0)
-    // result: index of maximum value, checking that next maximum is at least eps lower.
-    // returns -1 if no such value found (maximums too close)
+    bool DUMP_FAILED_IMAGES = false;
 
-    int FAIL = -1;
-
-    if (R.size() <= 0) { return(FAIL); }
-
-    auto currMaxIndex = 0;
-    for (size_t i = 1; i < R.size(); i++)
-    {
-      if (R[i] > R[currMaxIndex]) { currMaxIndex = i; }
-    }
-
-    if (R[currMaxIndex] < minDiff)
-    {
-      return(FAIL); // not ever greater than 0, no reason so check another max
-    }
-
-    if (R.size() <= 1) { return(currMaxIndex); } // actually, 0
-
-    auto nextMaxIndex = (currMaxIndex + 1) % R.size(); // actually, any other value
-
-    for (size_t i = 0; i < R.size(); i++)
-    {
-      if (i == currMaxIndex)
-      {
-        // skip, this is current max
-      }
-      else if (i == nextMaxIndex)
-      {
-        // skip, this is current next max
-      }
-      else
-      {
-        if (R[i] > R[nextMaxIndex]) { nextMaxIndex = i; }
-      }
-    }
-
-    auto nextMaxValue = R[nextMaxIndex];
-
-    if (nextMaxValue < 0) { nextMaxValue = 0; } // bug trap
-
-    if ((R[currMaxIndex] - nextMaxValue) >= minDiff)
-    {
-      return(currMaxIndex);
-    }
-
-    return(FAIL);
-  };
-
-  auto verifyProc= [getMaximumIndex](NN::Network &NET, const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, const char *stepName, int imagesPerSample) -> bool
-  {
     auto CHKRS = std::vector<std::vector<double>>();
     for (size_t dataIndex = 0; dataIndex < DATAS.size(); dataIndex++)
     {
@@ -520,44 +465,52 @@ bool sampleOcrNetwork()
     {
       auto imageIndex = dataIndex % imagesPerSample;
       auto sampleIndex = (dataIndex-imageIndex) / imagesPerSample;
+      bool isSimpleMatchOK = NN::NetworkStat::isResultSampleMatchEps(TARGS[dataIndex], CHKRS[dataIndex], veps);
 
-      auto isSimpleMatchOK = NN::isResultSampleMatchSimpleFunc(TARGS[dataIndex], CHKRS[dataIndex], veps);
-      auto smartMatchSampleIndex = getMaximumIndex(CHKRS[dataIndex], vdif);
-      auto smartMatchExpectIndex = getMaximumIndex(TARGS[dataIndex], vdif);
+      std::string status = "";
 
-      //if (true) // all
-      //if (!isSimpleMatchOK) // warn
-      if ((smartMatchSampleIndex < 0) || (smartMatchSampleIndex != smartMatchExpectIndex)) // fail
+      if (isSimpleMatchOK)
       {
-        auto status = "";
-
-        if ((smartMatchSampleIndex < 0) || (smartMatchSampleIndex != smartMatchExpectIndex))
-        {
-          status = "FAIL";
-          statFail++;
-        }
-        else if (!isSimpleMatchOK)
-        {
-          status = "WARN";
-          statWarn++;
-        }
-        else
-        {
-          status = "OK.OK.OK.OK.OK.OK.OK.OK";
-          statGood++;
-        }
-
-        console::log("Verification step " + STR(stepName) + "[" + STR(dataIndex) + "]" + ":" + STR(status) + ""); // , [DATAS[dataIndex], TARGS[dataIndex], CHKRS[dataIndex]], smartMatchSampleIndex, [veps, vdif]);
-        auto T = sampleAddLetTexts(DATAS[dataIndex], std::vector<std::string>(), true, true, true, true);
-        for (size_t lineIndex = 0; lineIndex < T.size(); lineIndex++)
-        {
-          console::log(T[lineIndex], lineIndex, sampleIndex, imageIndex);
-        }
-        isOK = false;
+        //status = "OK.OK.OK.OK.OK.OK.OK.OK"; // uncomment to dump all
+        statGood++;
       }
       else
       {
-        statGood++;
+        auto smartMatchSampleIndex = NN::NetworkStat::getMaximumIndexEps(CHKRS[dataIndex], vdif);
+        if (smartMatchSampleIndex < 0)
+        {
+          status = "FAIL*";
+          statFail++;
+          isOK = false;
+        }
+        else
+        {
+          auto smartMatchExpectIndex = NN::NetworkStat::getMaximumIndex(TARGS[dataIndex]);
+          if (smartMatchSampleIndex != smartMatchExpectIndex)
+          {
+            status = "FAIL";
+            statFail++;
+            isOK = false;
+          }
+          else // match, but not simple match
+          {
+            status = "WARN";
+            statWarn++;
+          }
+        }
+      }
+
+      if (!status.empty()) // && (status != ""))
+      {
+        console::log("Verification step " + STR(stepName) + "[" + STR(dataIndex) + "]" + ":" + STR(status) + ""); // , [DATAS[dataIndex], TARGS[dataIndex], CHKRS[dataIndex]], smartMatchSampleIndex, [veps, vdif]);
+        if (DUMP_FAILED_IMAGES)
+        {
+          auto T = sampleAddLetTexts(DATAS[dataIndex], std::vector<std::string>(), true, true, true, true);
+          for (size_t lineIndex = 0; lineIndex < T.size(); lineIndex++)
+          {
+            console::log(T[lineIndex], lineIndex, sampleIndex, imageIndex);
+          }
+        }
       }
     }
 
@@ -574,6 +527,8 @@ bool sampleOcrNetwork()
 
     return(isOK);
   };
+
+  // Verify on source dataset (dry run)
 
   verifyProc(NET, DATAS, TARGS, "Source", DATAS.size() / DATASE.size());
 

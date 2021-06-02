@@ -50,8 +50,8 @@ class TrainingProgressReporterConsole : public TrainingProgressReporter
 
     if ((reportInterval > 0) && ((n % reportInterval) == 0))
     {
-      auto variance = NN::TrainingDoneCheckerEps::getResultSetVariance(TARGS, CALCS);
-      console::log("TRAINING Varian[n,s]", MAX_N, n, variance);
+      auto variance = NN::NetworkStat::getResultSetAggError(TARGS, CALCS);
+      console::log("TRAINING AggError[n,s]", MAX_N, n, variance);
       if (reportSamples)
       {
         for (size_t s = 0; s < DATAS.size(); s++)
