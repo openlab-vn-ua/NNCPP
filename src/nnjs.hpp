@@ -317,14 +317,10 @@ class Layer : protected NonAssignable
 
   public: Layer(int N, NeuronFactory *maker)
   {
-    if (N < 0) { N = 0; }
     if (N > 0)
     {
       assert(maker != NULL);
-      for (int i = 0; i < N; i++)
-      {
-        this->addNeuron(maker);
-      }
+      this->addNeurons(N, maker);
     }
   }
 
@@ -355,17 +351,20 @@ class Layer : protected NonAssignable
     return(neuron);
   }
 
-  public: BaseNeuron *addNeuron(NeuronFactory *maker)
+  public: void addNeurons(int N, NeuronFactory *maker)
   {
+    if (N <= 0) { return; }
     assert(maker != NULL);
-    auto neuron = maker->makeNeuron();
-    addNeuron(neuron);
-    return(neuron);
+    for (int i = 0; i < N; i++)
+    {
+      auto neuron = maker->makeNeuron();
+      this->addNeuron(neuron);
+    }
   }
 
-  public: BaseNeuron *addNeuron(NeuronFactory &maker)
+  public: void addNeurons(int N, NeuronFactory &maker)
   {
-    return this->addNeuron(&maker);
+    addNeurons(N, &maker);
   }
 
   public: void addInputAll(const Layer *inputLayer)

@@ -345,16 +345,16 @@ bool sampleOcrNetwork()
 
   if (LAYERS == 3)
   {
-    auto IN  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY, NN::TheNeuronFactory<NN::InputNeuron>{}); IN->addNeuron(NN::TheNeuronFactory<NN::BiasNeuron>{});
-    auto L1  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY*1, NN::TheNeuronFactory<NN::ProcNeuronTrainee>{}); L1->addNeuron(NN::TheNeuronFactory<NN::BiasNeuron>{}); L1->addInputAll(IN);
+    auto IN  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY, NN::TheNeuronFactory<NN::InputNeuron>{}); IN->addNeurons(1,NN::TheNeuronFactory<NN::BiasNeuron>{});
+    auto L1  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY*1, NN::TheNeuronFactory<NN::ProcNeuronTrainee>{}); L1->addNeurons(1,NN::TheNeuronFactory<NN::BiasNeuron>{}); L1->addInputAll(IN);
     auto OUT = new NN::Layer(SAMPLES.size(), NN::TheNeuronFactory<NN::ProcNeuronTrainee>{}); OUT->addInputAll(L1); // Outputs: 0=A, 1=B, 2=C, ...
     NET.addLayer(IN); NET.addLayer(L1); NET.addLayer(OUT);
   }
   else
   {
-    auto IN  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY, NN::TheNeuronFactory<NN::InputNeuron>{}); IN->addNeuron(NN::TheNeuronFactory<NN::BiasNeuron>{});
-    auto L1  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY*1, NN::TheNeuronFactory<NN::ProcNeuronTrainee>{}); L1->addNeuron(NN::TheNeuronFactory<NN::BiasNeuron>{}); L1->addInputAll(IN);
-    auto L2  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY, NN::TheNeuronFactory<NN::ProcNeuronTrainee>{}); L2->addNeuron(NN::TheNeuronFactory<NN::BiasNeuron>{}); L2->addInputAll(L1);
+    auto IN  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY, NN::TheNeuronFactory<NN::InputNeuron>{}); IN->addNeurons(1,NN::TheNeuronFactory<NN::BiasNeuron>{});
+    auto L1  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY*1, NN::TheNeuronFactory<NN::ProcNeuronTrainee>{}); L1->addNeurons(1,NN::TheNeuronFactory<NN::BiasNeuron>{}); L1->addInputAll(IN);
+    auto L2  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY, NN::TheNeuronFactory<NN::ProcNeuronTrainee>{}); L2->addNeurons(1,NN::TheNeuronFactory<NN::BiasNeuron>{}); L2->addInputAll(L1);
     auto OUT = new NN::Layer(SAMPLES.size(), NN::TheNeuronFactory<NN::ProcNeuronTrainee>{}); OUT->addInputAll(L2); // Outputs: 0=A, 1=B, 2=C, ...
     NET.addLayer(IN); NET.addLayer(L1); NET.addLayer(L2); NET.addLayer(OUT);
   }
