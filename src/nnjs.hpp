@@ -794,6 +794,36 @@ namespace NetworkStat // static class
 
     return(R);
   }
+
+  inline size_t getNetWeightsCount(const Network &NET)
+  {
+    size_t result = 0;
+    size_t layersCount = NET.layers.size();
+    for (size_t i = 0; i < layersCount; i++) // TODO: may skip input layer later
+    {
+      size_t neuronsCount = NET.layers[i]->neurons.size();
+      for (size_t ii = 0; ii < neuronsCount; ii++)
+      {
+        auto neuron = dynamic_cast<ProcNeuron*>(NET.layers[i]->neurons[ii]);
+        if (neuron != NULL) // proc neuron
+        {
+          result += neuron->w.size();
+        }
+      }
+    }
+    return result;
+  }
+
+  inline size_t getNetNeuronsCount(const Network& NET)
+  {
+    size_t result = 0;
+    size_t layersCount = NET.layers.size();
+    for (size_t i = 0; i < layersCount; i++)
+    {
+      result += NET.layers[i]->neurons.size();
+    }
+    return result;
+  }
 }
 
 // Train functions

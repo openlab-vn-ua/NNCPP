@@ -7,6 +7,7 @@
 
 #include <nnjs.hpp>
 #include "nnjs_console.hpp"
+#include "nnjs_time_metter.hpp"
 #include <string>
 
 // Console reporter
@@ -26,6 +27,8 @@ class TrainingProgressReporterConsole : public TrainingProgressReporter
 
   protected: int  lastSeenIndex = 0;
 
+  protected: TimeMetter beginTimeMetter;
+
   public: TrainingProgressReporterConsole(int reportIntervalIn = DEFAULT_REPORT_INTERVAL, bool reportSamplesIn = false) 
           : reportInterval(reportIntervalIn), reportSamples(reportSamplesIn)
   {
@@ -36,7 +39,11 @@ class TrainingProgressReporterConsole : public TrainingProgressReporter
 
   // methods/callbacks
 
-  public: virtual void onTrainingBegin(TrainingArgs* args) { console::log("TRAINING Started", args->SPEED); }
+  public: virtual void onTrainingBegin(TrainingArgs* args)
+  { 
+    console::log("TRAINING Started", args->SPEED); 
+    beginTimeMetter.start();
+  }
 
   public: virtual bool onTrainingStep(TrainingArgs* args, TrainingStep* step)
   {
@@ -66,11 +73,20 @@ class TrainingProgressReporterConsole : public TrainingProgressReporter
 
   public: virtual void onTrainingEnd(TrainingArgs* args, bool isOk)
   {
+    beginTimeMetter.stop();
+
     auto n = lastSeenIndex + 1;
     auto &NET = args->NET;
+
+    auto spentTime = beginTimeMetter.millisPassed(); // ms
+    if (spentTime <= 0) { spentTime = 1; }
+
+    long scale = NN::NetworkStat::getNetWeightsCount(NET) * args->DATAS.size() * n;
+    auto speed = round((1.0 * scale / spentTime));
+
     if (isOk)
     {
-      console::log("TRAINING OK", "iterations:" + STR(n), NET.layers);
+      console::log("TRAINING OK", "iterations:" + STR(n), "time:" + STR(spentTime) + " ms", "speed:" + STR(speed) + "K w*s/s", NET.layers);
     }
     else
     {

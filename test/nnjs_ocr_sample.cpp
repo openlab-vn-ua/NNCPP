@@ -9,6 +9,7 @@
 #include <nnjs.hpp>
 #include "nnjs_console.hpp"
 #include "nnjs_console_training_stat.hpp"
+#include "nnjs_time_metter.hpp"
 
 namespace NN { namespace Demo {
 
@@ -358,6 +359,8 @@ bool sampleOcrNetwork()
     NET.addLayer(IN); NET.addLayer(L1); NET.addLayer(L2); NET.addLayer(OUT);
   }
 
+  console::log("Network created: Layers=" + STR(NET.layers.size()) + " Neurons=" + STR(NN::NetworkStat::getNetNeuronsCount(NET)) + " Weights=" + STR(NN::NetworkStat::getNetWeightsCount(NET)));
+
   // Dataset prepration
 
   // SAMPLES // 2D array [letter][sample] = data[]
@@ -447,11 +450,18 @@ bool sampleOcrNetwork()
   {
     bool DUMP_FAILED_IMAGES = false;
 
+    TimeMetter startTimeMetter;
+    startTimeMetter.start();
+
     auto CHKRS = std::vector<std::vector<double>>();
     for (size_t dataIndex = 0; dataIndex < DATAS.size(); dataIndex++)
     {
       CHKRS.push_back(NN::doProc(NET, DATAS[dataIndex]));
     }
+
+    startTimeMetter.stop();
+
+    auto stepTime = round((1000.0 * startTimeMetter.millisPassed() / DATAS.size())); // microseconds (us)
 
     auto vdif = 0.15; // max diff for smart verification
     auto veps = 0.4; // epsilon for strict verification
@@ -516,13 +526,13 @@ bool sampleOcrNetwork()
 
     if (isOK)
     {
-      console::log("Verification step " + STR(stepName) + ":OK [100%]");
+      console::log("Verification step " + STR(stepName) + ":OK [100%]" + (" InferenceTime:" + STR(stepTime) + "us"));
     }
     else
     {
       auto statFull = 0.0 + statGood + statFail + statWarn;
       auto showPerc = [](double val) -> std::string { return STR("") + STR(round(val * 1000.0) / 10.0); };
-      console::log("Verification step " + STR(stepName) + ":Done:" + (" GOOD=" + showPerc(statGood / statFull)) + (" WARN=" + showPerc(statWarn / statFull)) + (" FAIL=" + showPerc(statFail / statFull)));
+      console::log("Verification step " + STR(stepName) + ":Done:" + (" InferenceTime:" + STR(stepTime) + "us") + (" GOOD=" + showPerc(statGood / statFull)) + (" WARN=" + showPerc(statWarn / statFull)) + (" FAIL=" + showPerc(statFail / statFull)));
     }
 
     return(isOK);
