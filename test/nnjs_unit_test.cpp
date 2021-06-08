@@ -224,6 +224,172 @@ static bool doUnitTest1()
   return isOk;
 }
 
+static bool doUnitTest2()
+{
+  // Test case based on
+  // https://mattmazur.com/2015/03/17/a-step-by-step-backpropagation-example/
+  // Good example, but somehow forget to adjust the biases weights
+
+  auto isOk = true;
+
+  auto PN = [](NN::BaseNeuron* n) -> NN::ProcNeuronTrainee*
+  {
+    auto result = dynamic_cast<NN::ProcNeuronTrainee*>(n);
+    if (result == NULL) { throw std::invalid_argument("Invalid neuron type (ProcNeuronTrainee expected)"); }
+    return result;
+  };
+
+  auto IN = new NN::Layer(2, NN::TheNeuronFactory<NN::InputNeuron>{}); IN->addNeuron(new NN::BiasNeuron());
+
+  auto L1 = new NN::Layer(2, NN::TheNeuronFactory<NN::ProcNeuronTrainee>{}); L1->addNeuron(new NN::BiasNeuron());
+  //L1->addInputAll(IN);
+  PN(L1->neurons[0])->addInput(IN->neurons[0], 0.15);
+  PN(L1->neurons[0])->addInput(IN->neurons[1], 0.20);
+  PN(L1->neurons[0])->addInput(IN->neurons[2], 0.35);
+  PN(L1->neurons[1])->addInput(IN->neurons[0], 0.25);
+  PN(L1->neurons[1])->addInput(IN->neurons[1], 0.30);
+  PN(L1->neurons[1])->addInput(IN->neurons[2], 0.35);
+
+  auto OUT = new NN::Layer(2, NN::TheNeuronFactory<NN::ProcNeuronTrainee>{});
+  //OUT.addInputAll(L1);
+  PN(OUT->neurons[0])->addInput(L1->neurons[0], 0.40);
+  PN(OUT->neurons[0])->addInput(L1->neurons[1], 0.45);
+  PN(OUT->neurons[0])->addInput(L1->neurons[2], 0.60);
+  PN(OUT->neurons[1])->addInput(L1->neurons[0], 0.50);
+  PN(OUT->neurons[1])->addInput(L1->neurons[1], 0.55);
+  PN(OUT->neurons[1])->addInput(L1->neurons[2], 0.60);
+
+  NN::Network NET; NET.addLayer(IN), NET.addLayer(L1), NET.addLayer(OUT);
+
+  std::vector<double> DATA = { 0.05, 0.10 }; // Input
+  std::vector<double> EXPT = { 0.75136507, 0.772928465 }; // Expected calculated output with initial weights
+
+  auto CALC = NN::doProc(NET, DATA); // Actual output
+
+  if (!isFloatAlmostEqual(PN(L1->neurons[0])->getSum(), 0.3775))
+  {
+    isOk = false;
+    console::log("FAIL: L1[0].sum", CALC, EXPT); // neth1
+  }
+
+  if (!isFloatAlmostEqual(PN(L1->neurons[0])->get(), 0.593269992))
+  {
+    isOk = false;
+    console::log("FAIL: L1[0].out", CALC, EXPT); // outh1
+  }
+
+  if (!isFloatAlmostEqual(PN(L1->neurons[1])->get(), 0.596884378))
+  {
+    isOk = false;
+    console::log("FAIL: L1[1].out", CALC, EXPT); // outh2
+  }
+
+  if (!isFloatAlmostEqual(PN(OUT->neurons[0])->getSum(), 1.105905967))
+  {
+    isOk = false;
+    console::log("FAIL: OUT[0].sum", CALC, EXPT); // neto1
+  }
+
+  if (!isFloatAlmostEqual(PN(OUT->neurons[0])->get(), 0.75136507))
+  {
+    isOk = false;
+    console::log("FAIL: OUT[0].sum", CALC, EXPT); // outo1
+  }
+
+  if (!isFloatAlmostEqual(PN(OUT->neurons[1])->get(), 0.77290465))
+  {
+    isOk = false;
+    console::log("FAIL: OUT[1].sum", CALC, EXPT); // outo1
+  }
+
+  if (!isFloatAlmostEqual(CALC[0], EXPT[0]) || !isFloatAlmostEqual(CALC[1], EXPT[1]))
+  {
+    isOk = false;
+    console::log("FAIL: Result", CALC, EXPT);
+  }
+
+  // Backpropagation
+
+  std::vector<double> TARG = { 0.01, 0.99 }; // Expected valid output
+
+  auto ETotal = NN::NetworkStat::getResultSampleAggErrorSum(TARG, CALC) / NN::NetworkStat::AGG_ERROR_DIVIDED_BY;
+  if (!isFloatAlmostEqual(ETotal, 0.298371109))
+  {
+    isOk = false;
+    console::log("FAIL: ETotal", ETotal);
+  }
+
+  // Do train step
+
+  NN::doTrain(NET, std::vector<std::vector<double>>{DATA}, std::vector<std::vector<double>>{TARG}, 0.5, 1);
+
+  if (!isFloatAlmostEqual(PN(L1->neurons[0])->w[0], 0.149780716))
+  {
+    isOk = false;
+    console::log("FAIL: L1[0].w[0]", CALC, EXPT); // w1
+  }
+
+  if (!isFloatAlmostEqual(PN(L1->neurons[0])->w[1], 0.19956143))
+  {
+    isOk = false;
+    console::log("FAIL: L1[0].w[1]", CALC, EXPT); // w2
+  }
+
+  if (!isFloatAlmostEqual(PN(L1->neurons[1])->w[0], 0.24975114))
+  {
+    isOk = false;
+    console::log("FAIL: L1[1].w[0]", CALC, EXPT); // w3
+  }
+
+  if (!isFloatAlmostEqual(PN(L1->neurons[1])->w[1], 0.29950229))
+  {
+    isOk = false;
+    console::log("FAIL: L1[1].w[1]", CALC, EXPT); // w4
+  }
+
+  if (!isFloatAlmostEqual(PN(OUT->neurons[0])->w[0], 0.35891648))
+  {
+    isOk = false;
+    console::log("FAIL: OUT[0].w[0]", CALC, EXPT); // w5
+  }
+
+  if (!isFloatAlmostEqual(PN(OUT->neurons[0])->w[1], 0.408666186))
+  {
+    isOk = false;
+    console::log("FAIL: OUT[0].w[1]", CALC, EXPT); // w6
+  }
+
+  if (!isFloatAlmostEqual(PN(OUT->neurons[1])->w[0], 0.511301270))
+  {
+    isOk = false;
+    console::log("FAIL: OUT[1].w[0]", CALC, EXPT); // w7
+  }
+
+  if (!isFloatAlmostEqual(PN(OUT->neurons[1])->w[1], 0.561370121))
+  {
+    isOk = false;
+    console::log("FAIL: OUT[1].w[1]", CALC, EXPT); // w8
+  }
+
+  // Restore baises back, as exmaple does not affects biases
+
+  PN(L1->neurons[0])->w[2] = 0.35;
+  PN(L1->neurons[1])->w[2] = 0.35;
+  PN(OUT->neurons[0])->w[2] = 0.60;
+  PN(OUT->neurons[1])->w[2] = 0.60;
+
+  auto CALCT1 = NN::doProc(NET, DATA); // Actual output after 1st iteration
+
+  auto ETotalT1 = NN::NetworkStat::getResultSampleAggErrorSum(TARG, CALCT1) / NN::NetworkStat::AGG_ERROR_DIVIDED_BY;
+  if (!isFloatAlmostEqual(ETotalT1, 0.291027924))
+  {
+    isOk = false;
+    console::log("FAIL: ETotalT1", ETotalT1);
+  }
+
+  return isOk;
+}
+
 } }
 
 // Test case(s) [PRNG]
@@ -413,6 +579,7 @@ bool runUnitTests()
   std::vector<std::function<bool()>> TESTS 
   {
     &doUnitTest1, 
+    &doUnitTest2,
     &doUnitTestRNG0,
     &doUnitTestRNG1,
     &doUnitTestRNG2, 
@@ -427,10 +594,18 @@ bool runUnitTests()
   for (size_t i = 0; i < count; i++)
   {
     auto test = TESTS[i];
-    if (!test())
+    try
+    {
+      if (!test())
+      {
+        failed++;
+        console::log("UNIT " + STR(i) + " failed");
+      }
+    }
+    catch (std::exception& e)
     {
       failed++;
-      console::log("UNIT "+STR(i)+" failed");
+      console::log("UNIT " + STR(i) + " failed with exception " + STR(e.what()));
     }
   }
 
