@@ -497,6 +497,18 @@ inline std::vector<double> doProc(Network &NET, const std::vector<double> &input
   return doProcGetResult(NET);
 }
 
+// doProc with alternative params format
+
+inline std::vector<double> doProc(Network* NET, const std::vector<double>& inputs)
+{
+  return doProc(*NET, inputs);
+}
+
+inline std::vector<double> doProc(Network* NET, const std::vector<double>* inputs)
+{
+  return doProc(*NET, *inputs);
+}
+
 // Training functions
 
 inline double getDeltaOutputSum(ProcNeuronTrainee *outNeuron, double OSME) // OSME = output sum margin of error (AKA Expected - Calculated)
@@ -1094,10 +1106,22 @@ inline bool doTrain(Network &NET, const std::vector<std::vector<double>> &DATAS,
   return(isDone);
 }
 
+// doTrain with alternative params format
+
+inline bool doTrain(Network* NET, const std::vector<std::vector<double>>& DATAS, const std::vector<std::vector<double>>& TARGS, double SPEED = -1, int MAX_N = -1, TrainingProgressReporter* progressReporter = NULL, TrainingDoneChecker* isTrainingDoneChecker = NULL)
+{
+  return doTrain(*NET, DATAS, TARGS, SPEED, MAX_N, progressReporter, isTrainingDoneChecker);
+}
+
+inline bool doTrain(Network* NET, const std::vector<std::vector<double>>* DATAS, const std::vector<std::vector<double>>* TARGS, double SPEED = -1, int MAX_N = -1, TrainingProgressReporter* progressReporter = NULL, TrainingDoneChecker* isTrainingDoneChecker = NULL)
+{
+  return doTrain(*NET, *DATAS, *TARGS, SPEED, MAX_N, progressReporter, isTrainingDoneChecker);
+}
+
 /*
 // Exports
 
-// Some internals
+// Some internals (Similar API to JS version)
 
 NN.Internal = {};
 NN.Internal.PRNG = PRNG;
