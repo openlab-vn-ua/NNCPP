@@ -22,10 +22,10 @@ bool sampleXorNetwork()
     console::log("sampleOcrNetwork", "seed=", seed);
   }
 
-  auto IN  = new NN::Layer(2, NN::TheNeuronFactory<NN::InputNeuron>{}); IN->addNeuron(new NN::BiasNeuron());
-  auto L1  = new NN::Layer(2, NN::TheNeuronFactory<NN::ProcNeuronTrainee>{}); L1->addNeuron(new NN::BiasNeuron());
+  auto IN  = new NN::Layer(2, NN::TheNeuronFactory<NN::InputNeuron>()); IN->addNeuron(new NN::BiasNeuron());
+  auto L1  = new NN::Layer(2, NN::TheNeuronFactory<NN::ProcNeuronTrainee>()); L1->addNeuron(new NN::BiasNeuron());
   L1->addInputAll(IN);
-  auto OUT = new NN::Layer(1, NN::TheNeuronFactory<NN::ProcNeuronTrainee>{});
+  auto OUT = new NN::Layer(1, NN::TheNeuronFactory<NN::ProcNeuronTrainee>());
   OUT->addInputAll(L1);
 
   NN::Network NET; // = [IN, L1, OUT];
@@ -48,12 +48,12 @@ bool sampleXorNetwork2()
     console::log("sampleOcrNetwork2", "seed=", seed);
   }
 
-  auto IN  = new NN::Layer(2, NN::TheNeuronFactory<NN::InputNeuron>{}); IN->addNeuron(new NN::BiasNeuron());
-  auto L1  = new NN::Layer(3, NN::TheNeuronFactory<NN::ProcNeuronTrainee>{}); L1->addNeuron(new NN::BiasNeuron());
+  auto IN  = new NN::Layer(2, NN::TheNeuronFactory<NN::InputNeuron>()); IN->addNeuron(new NN::BiasNeuron());
+  auto L1  = new NN::Layer(3, NN::TheNeuronFactory<NN::ProcNeuronTrainee>()); L1->addNeuron(new NN::BiasNeuron());
   L1->addInputAll(IN);
-  auto L2  = new NN::Layer(3, NN::TheNeuronFactory<NN::ProcNeuronTrainee>{}); L2->addNeuron(new NN::BiasNeuron());
+  auto L2  = new NN::Layer(3, NN::TheNeuronFactory<NN::ProcNeuronTrainee>()); L2->addNeuron(new NN::BiasNeuron());
   L2->addInputAll(L1);
-  auto OUT = new NN::Layer(1, NN::TheNeuronFactory<NN::ProcNeuronTrainee>{});
+  auto OUT = new NN::Layer(1, NN::TheNeuronFactory<NN::ProcNeuronTrainee>());
   OUT->addInputAll(L2);
 
   NN::Network NET; // = [IN, L1, L2, OUT];

@@ -86,9 +86,9 @@ static bool doUnitTest1()
     return(target);
   };
 
-  auto IN  = new NN::Layer(2, NN::TheNeuronFactory<NN::InputNeuron>{});
+  auto IN  = new NN::Layer(2, NN::TheNeuronFactory<NN::InputNeuron>());
 
-  auto L1  = new NN::Layer(3, NN::TheNeuronFactory<NN::ProcNeuronTrainee>{}); 
+  auto L1  = new NN::Layer(3, NN::TheNeuronFactory<NN::ProcNeuronTrainee>()); 
   //L1->addInputAll(IN);
   addInput(L1->neurons[0], IN->neurons[0], 0.8);
   addInput(L1->neurons[0], IN->neurons[1], 0.2);
@@ -97,7 +97,7 @@ static bool doUnitTest1()
   addInput(L1->neurons[2], IN->neurons[0], 0.3);
   addInput(L1->neurons[2], IN->neurons[1], 0.5);
 
-  auto OUT = new NN::Layer(1, NN::TheNeuronFactory<NN::ProcNeuronTrainee>{}); 
+  auto OUT = new NN::Layer(1, NN::TheNeuronFactory<NN::ProcNeuronTrainee>()); 
   //OUT->addInputAll(L1);
   addInput(OUT->neurons[0], L1->neurons[0], 0.3);
   addInput(OUT->neurons[0], L1->neurons[1], 0.5);
@@ -239,9 +239,9 @@ static bool doUnitTest2()
     return result;
   };
 
-  auto IN = new NN::Layer(2, NN::TheNeuronFactory<NN::InputNeuron>{}); IN->addNeuron(new NN::BiasNeuron());
+  auto IN = new NN::Layer(2, NN::TheNeuronFactory<NN::InputNeuron>()); IN->addNeuron(new NN::BiasNeuron());
 
-  auto L1 = new NN::Layer(2, NN::TheNeuronFactory<NN::ProcNeuronTrainee>{}); L1->addNeuron(new NN::BiasNeuron());
+  auto L1 = new NN::Layer(2, NN::TheNeuronFactory<NN::ProcNeuronTrainee>()); L1->addNeuron(new NN::BiasNeuron());
   //L1->addInputAll(IN);
   PN(L1->neurons[0])->addInput(IN->neurons[0], 0.15);
   PN(L1->neurons[0])->addInput(IN->neurons[1], 0.20);
@@ -250,7 +250,7 @@ static bool doUnitTest2()
   PN(L1->neurons[1])->addInput(IN->neurons[1], 0.30);
   PN(L1->neurons[1])->addInput(IN->neurons[2], 0.35);
 
-  auto OUT = new NN::Layer(2, NN::TheNeuronFactory<NN::ProcNeuronTrainee>{});
+  auto OUT = new NN::Layer(2, NN::TheNeuronFactory<NN::ProcNeuronTrainee>());
   //OUT.addInputAll(L1);
   PN(OUT->neurons[0])->addInput(L1->neurons[0], 0.40);
   PN(OUT->neurons[0])->addInput(L1->neurons[1], 0.45);
