@@ -20,8 +20,8 @@ NET.addLayer(IN); NET.addLayer(L1); NET.addLayer(OUT);
 ### Train
 ```
 // NN::doTrain(NET, DATAS, TARGS) // run training session
-//std::vector<std::vector<double>> DATAS = [ [...], ... ]; // source data samples (each sample holds values for inputs)
-//std::vector<std::vector<double>> TARGS = [ [...], ... ]; // expected result vectors (each result holds expected outputs)
+//std::vector<std::vector<double>> DATAS = [ [...], ... ]; // source data (each sample holds values for inputs)
+//std::vector<std::vector<double>> TARGS = [ [...], ... ]; // expected results (each result holds expected outputs)
 cout << "Training, please wait ...";
 if (!NN::doTrain(NET, DATAS, TARGS))
 {
@@ -40,6 +40,7 @@ auto CALC = NN::doProc(NET, DATA);
 
 ## Cousin JavaScript project: NNJS
 There is a NN engine implemenation on JavaScript with (almost) the same API:
+
 https://github.com/openlab-vn-ua/NNJS
 
 ## Useful links (and thanks to!)
