@@ -312,7 +312,7 @@ static bool doUnitTest2()
 
   std::vector<double> TARG = { 0.01, 0.99 }; // Expected valid output
 
-  auto ETotal = NN::NetworkStat::getResultSampleAggErrorSum(TARG, CALC) / NN::NetworkStat::AGG_ERROR_DIVIDED_BY;
+  auto ETotal = NN::NetworkStat::getResultSampleAggErrorSum(TARG, CALC) * NN::NetworkStat::AGG_ERROR_SUM_TO_SIMPLE_LOSS_MULTIPLY_BY;
   if (!isFloatAlmostEqual(ETotal, 0.298371109))
   {
     isOk = false;
@@ -380,7 +380,7 @@ static bool doUnitTest2()
 
   auto CALCT1 = NN::doProc(NET, DATA); // Actual output after 1st iteration
 
-  auto ETotalT1 = NN::NetworkStat::getResultSampleAggErrorSum(TARG, CALCT1) / NN::NetworkStat::AGG_ERROR_DIVIDED_BY;
+  auto ETotalT1 = NN::NetworkStat::getResultSampleAggErrorSum(TARG, CALCT1) * NN::NetworkStat::AGG_ERROR_SUM_TO_SIMPLE_LOSS_MULTIPLY_BY;
   if (!isFloatAlmostEqual(ETotalT1, 0.291027924))
   {
     isOk = false;

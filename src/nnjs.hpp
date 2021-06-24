@@ -732,9 +732,11 @@ namespace NetworkStat // static class
     return(true);
   }
 
-  // Aggregated error
+  // Aggregated error sum (AKA source for simple loss function)
 
-  const double AGG_ERROR_DIVIDED_BY = 2.0; // to be used as error function, should be mutiplied by 1/2 so derivative will not have 2x in front
+  // Actually, simple loss function on sample is aggregated error sum divided by 2.0.
+  // The divisor is need to have a "clean" partial derivative as simple difference
+  // in many cases divisor ommited, as different anyway is mutiplied to small number (learning rate), but we define it here just in case
 
   inline double getResultSampleAggErrorSum(const std::vector<double> &TARG, const std::vector<double> &CALC)
   {
@@ -754,7 +756,7 @@ namespace NetworkStat // static class
     return(result);
   }
 
-  inline double getResultSetAggErrorSum(const std::vector<std::vector<double>> &TARGS, const std::vector<std::vector<double>> &CALCS)  // private
+  inline double getResultSetAggErrorSum(const std::vector<std::vector<double>> &TARGS, const std::vector<std::vector<double>> &CALCS)
   {
     auto count = TARGS.size();
 
@@ -770,21 +772,53 @@ namespace NetworkStat // static class
     return(result);
   }
 
-  inline double getResultSetAggError(const std::vector<std::vector<double>> &TARGS, const std::vector<std::vector<double>> &CALCS)
+  // AggSum to SimpleLoss mutiplier: to be used as loss function (error function), should be mutiplied by 1/2 so derivative will not have 2x in front
+
+  const double AGG_ERROR_SUM_TO_SIMPLE_LOSS_MULTIPLY_BY = 0.5;
+
+  inline double getResultSampleSimpleLoss(const std::vector<double> &TARG, const std::vector<double> &CALC)
+  {
+    return getResultSampleAggErrorSum(TARG, CALC) * AGG_ERROR_SUM_TO_SIMPLE_LOSS_MULTIPLY_BY;
+  }
+
+  // Mean Squared error
+
+  inline double getResultSampleMSE(const std::vector<double> &TARG, const std::vector<double> &CALC)
+  {
+    auto result = getResultSampleAggErrorSum(TARG, CALC);
+    auto count = TARG.size();
+    assert(count == CALC.size());
+    if (count <= 0) { return NAN; }
+    return(result / count);
+  }
+
+  inline double getResultSetMSE(const std::vector<std::vector<double>> &TARGS, const std::vector<std::vector<double>> &CALCS)
   {
     auto result = getResultSetAggErrorSum(TARGS, CALCS);
     auto count = TARGS.size();
     if (count > 0) { count *= TARGS[0].size(); }
     if (count <= 0) { return NAN; }
-    return(result / count / AGG_ERROR_DIVIDED_BY);
+    return(result / count);
   }
 
-  inline double getResultSetAggErrorByAggErrorSum(double sum, size_t sampleSize, size_t samplesCount = 1)
+  inline double getResultSetMSEByAggErrorSum(double sum, size_t sampleSize, size_t samplesCount = 1)
   {
     auto count = samplesCount;
     if (count > 0) { count *= sampleSize; }
     if (count <= 0) { return NAN; }
-    return(sum / count / AGG_ERROR_DIVIDED_BY);
+    return(sum / count);
+  }
+
+  // Aggregated error (AKA MSE rooted)
+
+  inline double getResultSetAggError(const std::vector<std::vector<double>> &TARGS, const std::vector<std::vector<double>> &CALCS)
+  {
+    return std::sqrt(getResultSetMSE(TARGS, CALCS));
+  }
+
+  inline double getResultSetAggErrorByAggErrorSum(double sum, size_t sampleSize, size_t samplesCount = 1)
+  {
+    return std::sqrt(getResultSetMSEByAggErrorSum(sum, sampleSize, samplesCount));
   }
 
   // Misc
