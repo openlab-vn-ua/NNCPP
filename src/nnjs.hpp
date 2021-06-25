@@ -1276,6 +1276,17 @@ NN.Internal.getDeltaOutputSum  = getDeltaOutputSum;
 NN.Internal.getDeltaWeights    = getDeltaWeights;
 NN.Internal.getDeltaHiddenSums = getDeltaHiddenSums;
 
+// Activation
+
+NN.ActFuncSigmoid = ActFuncSigmoid;
+NN.ActFuncSigmoidTrainee = ActFuncSigmoidTrainee;
+NN.ActFuncRELU = ActFuncRELU;
+NN.ActFuncRELUTrainee = ActFuncRELUTrainee;
+NN.ActFuncLRELU = ActFuncLRELU;
+NN.ActFuncLRELUTrainee = ActFuncLRELUTrainee;
+NN.ActFuncTanh = ActFuncTanh;
+NN.ActFuncTanhTrainee = ActFuncTanhTrainee;
+
 // Core
 
 NN.BaseNeuron = BaseNeuron;
