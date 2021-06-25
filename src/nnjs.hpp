@@ -395,6 +395,9 @@ class BiasNeuron : public BaseNeuron
   }
 };
 
+/// Neuron factory
+/// Creates neurons when batch creation is used
+
 class NeuronFactory
 {
   public: virtual BaseNeuron *makeNeuron() = 0;
@@ -1275,11 +1278,18 @@ NN.Internal.getDeltaHiddenSums = getDeltaHiddenSums;
 
 // Core
 
-NN.ProcNeuron  = ProcNeuron;
-NN.InputNeuron = InputNeuron;
-NN.BiasNeuron  = BiasNeuron;
+NN.BaseNeuron = BaseNeuron;
+NN.InputNeuron = InputNeuron; NN.dynamicCastInputNeuron = dynamicCastInputNeuron;
+NN.ProcNeuron = ProcNeuron; NN.dynamicCastProcNeuron = dynamicCastProcNeuron;
+NN.ProcNeuronTrainee = ProcNeuronTrainee; NN.dynamicCastProcNeuronTrainee = dynamicCastProcNeuronTrainee;
+NN.BiasNeuron = BiasNeuron;
+
 NN.Layer       = Layer;
+NN.Network     = Network;
 NN.doProc      = doProc;
+
+NN.TheNeuronFactory = TheNeuronFactory;
+NN.ExtNeuronFactory = ExtNeuronFactory;
 
 // Math
 
