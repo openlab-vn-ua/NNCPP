@@ -75,7 +75,7 @@ static bool doUnitTest1()
     }
   };
 
-  auto NTE = [](BaseNeuron *source)
+  auto PNT = [](BaseNeuron *source)
   {
     auto target = dynamic_cast<ProcNeuronTrainee*>(source);
     if (target == NULL)
@@ -87,6 +87,8 @@ static bool doUnitTest1()
   };
 
   auto IN  = new NN::Layer(2, NN::TheNeuronFactory<NN::InputNeuron>());
+
+  // hidden layer
 
   auto L1  = new NN::Layer(3, NN::TheNeuronFactory<NN::ProcNeuronTrainee>()); 
   //L1->addInputAll(IN);
@@ -130,14 +132,14 @@ static bool doUnitTest1()
     console::log("FAIL: output sum margin of error", OSME);
   }
 
-  auto DOS = NN::getDeltaOutputSum(NTE(OUT->neurons[0]), OSME);
+  auto DOS = NN::getDeltaOutputSum(PNT(OUT->neurons[0]), OSME);
   if (!isFloatAlmostEqual(DOS, -0.13529621033156358))
   {
     console::log("FAIL: delta output sum", DOS); // How much sum have to be adjusted
   }
 
-  auto &pOut = NTE(OUT->neurons[0])->inputs; // Pre-output layer (L1)
-  auto DWS = NN::getDeltaWeights(NTE(OUT->neurons[0]), DOS);
+  auto &pOut = PNT(OUT->neurons[0])->inputs; // Pre-output layer (L1)
+  auto DWS = NN::getDeltaWeights(PNT(OUT->neurons[0]), DOS);
 
   //console::log("INFO: delta weights", DWS);
 
@@ -146,10 +148,10 @@ static bool doUnitTest1()
     console::log("FAIL: delta weights", DWS); // How much w of prev neurons have to be adjusted
   }
 
-  NTE(OUT->neurons[0])->initNewWeights();
-  NTE(OUT->neurons[0])->addNewWeightsDelta(DWS);
+  PNT(OUT->neurons[0])->initNewWeights();
+  PNT(OUT->neurons[0])->addNewWeightsDelta(DWS);
 
-  auto NWS = NTE(OUT->neurons[0])->nw;
+  auto NWS = PNT(OUT->neurons[0])->nw;
 
   if (!isFloatListAlmostEqual(NWS, std::vector<double> { 0.11493109541904689, 0.3278312708760685, 0.7039112836311693 }))
   {
@@ -159,7 +161,7 @@ static bool doUnitTest1()
   // calclulate how to change outputs of prev layer (DOS for each neuton of prev layer)
   // DOS is delta output sum for this neuron
 
-  auto DHS = NN::getDeltaHiddenSums(NTE(OUT->neurons[0]), DOS);
+  auto DHS = NN::getDeltaHiddenSums(PNT(OUT->neurons[0]), DOS);
 
   if (!isFloatListAlmostEqual(DHS, std::vector<double> { -0.08866949824511623, -0.045540261294143396, -0.032156856991522986 }))
   {
@@ -173,10 +175,10 @@ static bool doUnitTest1()
 
   for (size_t i = 0; i < pOut.size(); i++)
   {
-    DWSL1.push_back(NN::getDeltaWeights(NTE(L1->neurons[i]), DHS[i]));
-    NTE(L1->neurons[i])->initNewWeights(); // would work this way since only one output neuron (so will be called once for each hidden neuron)
-    NTE(L1->neurons[i])->addNewWeightsDelta(DWSL1[i]);
-    NWSL1.push_back(NTE(L1->neurons[i])->nw);
+    DWSL1.push_back(NN::getDeltaWeights(PNT(L1->neurons[i]), DHS[i]));
+    PNT(L1->neurons[i])->initNewWeights(); // would work this way since only one output neuron (so will be called once for each hidden neuron)
+    PNT(L1->neurons[i])->addNewWeightsDelta(DWSL1[i]);
+    NWSL1.push_back(PNT(L1->neurons[i])->nw);
   }
 
   if (!isFloatListAlmostEqual(DHS, std::vector<double> { -0.08866949824511623, -0.045540261294143396, -0.032156856991522986 }))
@@ -204,11 +206,11 @@ static bool doUnitTest1()
 
   // assign
 
-  NTE(OUT->neurons[0])->applyNewWeights();
+  PNT(OUT->neurons[0])->applyNewWeights();
 
   for (size_t i = 0; i < pOut.size(); i++)
   {
-    NTE(L1->neurons[i])->applyNewWeights();
+    PNT(L1->neurons[i])->applyNewWeights();
   }
 
   auto CALC2 = NN::doProc(NET, DATA)[0]; // Actual output
@@ -232,7 +234,7 @@ static bool doUnitTest2()
 
   auto isOk = true;
 
-  auto PN = [](NN::BaseNeuron* n) -> NN::ProcNeuronTrainee*
+  auto PNT = [](NN::BaseNeuron* n) -> NN::ProcNeuronTrainee*
   {
     auto result = dynamic_cast<NN::ProcNeuronTrainee*>(n);
     if (result == NULL) { throw std::invalid_argument("Invalid neuron type (ProcNeuronTrainee expected)"); }
@@ -243,21 +245,21 @@ static bool doUnitTest2()
 
   auto L1 = new NN::Layer(2, NN::TheNeuronFactory<NN::ProcNeuronTrainee>()); L1->addNeuron(new NN::BiasNeuron());
   //L1->addInputAll(IN);
-  PN(L1->neurons[0])->addInput(IN->neurons[0], 0.15);
-  PN(L1->neurons[0])->addInput(IN->neurons[1], 0.20);
-  PN(L1->neurons[0])->addInput(IN->neurons[2], 0.35);
-  PN(L1->neurons[1])->addInput(IN->neurons[0], 0.25);
-  PN(L1->neurons[1])->addInput(IN->neurons[1], 0.30);
-  PN(L1->neurons[1])->addInput(IN->neurons[2], 0.35);
+  PNT(L1->neurons[0])->addInput(IN->neurons[0], 0.15);
+  PNT(L1->neurons[0])->addInput(IN->neurons[1], 0.20);
+  PNT(L1->neurons[0])->addInput(IN->neurons[2], 0.35);
+  PNT(L1->neurons[1])->addInput(IN->neurons[0], 0.25);
+  PNT(L1->neurons[1])->addInput(IN->neurons[1], 0.30);
+  PNT(L1->neurons[1])->addInput(IN->neurons[2], 0.35);
 
   auto OUT = new NN::Layer(2, NN::TheNeuronFactory<NN::ProcNeuronTrainee>());
   //OUT.addInputAll(L1);
-  PN(OUT->neurons[0])->addInput(L1->neurons[0], 0.40);
-  PN(OUT->neurons[0])->addInput(L1->neurons[1], 0.45);
-  PN(OUT->neurons[0])->addInput(L1->neurons[2], 0.60);
-  PN(OUT->neurons[1])->addInput(L1->neurons[0], 0.50);
-  PN(OUT->neurons[1])->addInput(L1->neurons[1], 0.55);
-  PN(OUT->neurons[1])->addInput(L1->neurons[2], 0.60);
+  PNT(OUT->neurons[0])->addInput(L1->neurons[0], 0.40);
+  PNT(OUT->neurons[0])->addInput(L1->neurons[1], 0.45);
+  PNT(OUT->neurons[0])->addInput(L1->neurons[2], 0.60);
+  PNT(OUT->neurons[1])->addInput(L1->neurons[0], 0.50);
+  PNT(OUT->neurons[1])->addInput(L1->neurons[1], 0.55);
+  PNT(OUT->neurons[1])->addInput(L1->neurons[2], 0.60);
 
   NN::Network NET; NET.addLayer(IN), NET.addLayer(L1), NET.addLayer(OUT);
 
@@ -266,37 +268,37 @@ static bool doUnitTest2()
 
   auto CALC = NN::doProc(NET, DATA); // Actual output
 
-  if (!isFloatAlmostEqual(PN(L1->neurons[0])->getSum(), 0.3775))
+  if (!isFloatAlmostEqual(PNT(L1->neurons[0])->getSum(), 0.3775))
   {
     isOk = false;
     console::log("FAIL: L1[0].sum", CALC, EXPT); // neth1
   }
 
-  if (!isFloatAlmostEqual(PN(L1->neurons[0])->get(), 0.593269992))
+  if (!isFloatAlmostEqual(PNT(L1->neurons[0])->get(), 0.593269992))
   {
     isOk = false;
     console::log("FAIL: L1[0].out", CALC, EXPT); // outh1
   }
 
-  if (!isFloatAlmostEqual(PN(L1->neurons[1])->get(), 0.596884378))
+  if (!isFloatAlmostEqual(PNT(L1->neurons[1])->get(), 0.596884378))
   {
     isOk = false;
     console::log("FAIL: L1[1].out", CALC, EXPT); // outh2
   }
 
-  if (!isFloatAlmostEqual(PN(OUT->neurons[0])->getSum(), 1.105905967))
+  if (!isFloatAlmostEqual(PNT(OUT->neurons[0])->getSum(), 1.105905967))
   {
     isOk = false;
     console::log("FAIL: OUT[0].sum", CALC, EXPT); // neto1
   }
 
-  if (!isFloatAlmostEqual(PN(OUT->neurons[0])->get(), 0.75136507))
+  if (!isFloatAlmostEqual(PNT(OUT->neurons[0])->get(), 0.75136507))
   {
     isOk = false;
     console::log("FAIL: OUT[0].sum", CALC, EXPT); // outo1
   }
 
-  if (!isFloatAlmostEqual(PN(OUT->neurons[1])->get(), 0.77290465))
+  if (!isFloatAlmostEqual(PNT(OUT->neurons[1])->get(), 0.77290465))
   {
     isOk = false;
     console::log("FAIL: OUT[1].sum", CALC, EXPT); // outo1
@@ -323,49 +325,49 @@ static bool doUnitTest2()
 
   NN::doTrain(NET, std::vector<std::vector<double>>{DATA}, std::vector<std::vector<double>>{TARG}, 0.5, 1);
 
-  if (!isFloatAlmostEqual(PN(L1->neurons[0])->w[0], 0.149780716))
+  if (!isFloatAlmostEqual(PNT(L1->neurons[0])->w[0], 0.149780716))
   {
     isOk = false;
     console::log("FAIL: L1[0].w[0]", CALC, EXPT); // w1
   }
 
-  if (!isFloatAlmostEqual(PN(L1->neurons[0])->w[1], 0.19956143))
+  if (!isFloatAlmostEqual(PNT(L1->neurons[0])->w[1], 0.19956143))
   {
     isOk = false;
     console::log("FAIL: L1[0].w[1]", CALC, EXPT); // w2
   }
 
-  if (!isFloatAlmostEqual(PN(L1->neurons[1])->w[0], 0.24975114))
+  if (!isFloatAlmostEqual(PNT(L1->neurons[1])->w[0], 0.24975114))
   {
     isOk = false;
     console::log("FAIL: L1[1].w[0]", CALC, EXPT); // w3
   }
 
-  if (!isFloatAlmostEqual(PN(L1->neurons[1])->w[1], 0.29950229))
+  if (!isFloatAlmostEqual(PNT(L1->neurons[1])->w[1], 0.29950229))
   {
     isOk = false;
     console::log("FAIL: L1[1].w[1]", CALC, EXPT); // w4
   }
 
-  if (!isFloatAlmostEqual(PN(OUT->neurons[0])->w[0], 0.35891648))
+  if (!isFloatAlmostEqual(PNT(OUT->neurons[0])->w[0], 0.35891648))
   {
     isOk = false;
     console::log("FAIL: OUT[0].w[0]", CALC, EXPT); // w5
   }
 
-  if (!isFloatAlmostEqual(PN(OUT->neurons[0])->w[1], 0.408666186))
+  if (!isFloatAlmostEqual(PNT(OUT->neurons[0])->w[1], 0.408666186))
   {
     isOk = false;
     console::log("FAIL: OUT[0].w[1]", CALC, EXPT); // w6
   }
 
-  if (!isFloatAlmostEqual(PN(OUT->neurons[1])->w[0], 0.511301270))
+  if (!isFloatAlmostEqual(PNT(OUT->neurons[1])->w[0], 0.511301270))
   {
     isOk = false;
     console::log("FAIL: OUT[1].w[0]", CALC, EXPT); // w7
   }
 
-  if (!isFloatAlmostEqual(PN(OUT->neurons[1])->w[1], 0.561370121))
+  if (!isFloatAlmostEqual(PNT(OUT->neurons[1])->w[1], 0.561370121))
   {
     isOk = false;
     console::log("FAIL: OUT[1].w[1]", CALC, EXPT); // w8
@@ -373,10 +375,10 @@ static bool doUnitTest2()
 
   // Restore baises back, as exmaple does not affects biases
 
-  PN(L1->neurons[0])->w[2] = 0.35;
-  PN(L1->neurons[1])->w[2] = 0.35;
-  PN(OUT->neurons[0])->w[2] = 0.60;
-  PN(OUT->neurons[1])->w[2] = 0.60;
+  PNT(L1->neurons[0])->w[2] = 0.35;
+  PNT(L1->neurons[1])->w[2] = 0.35;
+  PNT(OUT->neurons[0])->w[2] = 0.60;
+  PNT(OUT->neurons[1])->w[2] = 0.60;
 
   auto CALCT1 = NN::doProc(NET, DATA); // Actual output after 1st iteration
 
