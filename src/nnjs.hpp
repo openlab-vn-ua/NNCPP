@@ -57,18 +57,112 @@ class NonAssignable // derive from this to prevent copy of move
 
 using namespace NN::Internal;
 
-// Activation functions
+// Activation : Base
 
-inline double S(double x)
+/// Activation function provider (Should be stateless)
+class ActFunc
 {
-  return(1.0/(1.0+exp(-x)));
-}
+  /// Activation function
+  public: virtual double S(double x) const = 0; 
+};
 
-inline double SD(double x) //S derivative AKA S' AKA dS/dX
+/// Activation function provider for training  (Should be stateless)
+class ActFuncTrainee : public ActFunc
 {
-  // e^x/(1 + e^x)^2
-  return(std::exp(x)/std::pow(1.0+std::exp(x),2));
-}
+  /// Activation function derivative
+  public: virtual double SD(double x) const = 0; 
+};
+
+// Activation : Sigmoid
+
+class CalcMathSigmoid // static provider
+{
+  public: static double S(double x)  { return(1.0 / (1.0 + exp(-x))); } // S is sigmoid function
+  public: static double SD(double x) { return(std::exp(x) / std::pow(1.0 + std::exp(x), 2)); } // S derivative AKA S' AKA dS/dX // e^x/(1 + e^x)^2
+};
+
+class ActFuncSigmoid : public ActFunc
+{
+  public: virtual double S(double x) const override  { return CalcMathSigmoid::S(x); }
+  public: static ActFuncSigmoid* getInstance() { static ActFuncSigmoid s; return &s; }
+};
+
+class ActFuncSigmoidTrainee : public ActFuncTrainee
+{
+  public: virtual double S(double x)  const override { return CalcMathSigmoid::S(x);  }
+  public: virtual double SD(double x) const override { return CalcMathSigmoid::SD(x); }
+  public: static ActFuncSigmoidTrainee* getInstance() { static ActFuncSigmoidTrainee s; return &s; }
+};
+
+// Activation : RELU
+
+class CalcMathRELU // static provider
+{
+  public: static double S(double x)  { return (x < 0) ? 0.0 : x; }
+  public: static double SD(double x) { return (x < 0) ? 0.0 : 1.0; }
+};
+
+class ActFuncRELU : public ActFunc
+{
+  public: virtual double S(double x) const override { return CalcMathRELU::S(x); }
+  public: static ActFuncRELU* getInstance() { static ActFuncRELU s; return &s; }
+};
+
+class ActFuncRELUTrainee : public ActFuncTrainee
+{
+  public: virtual double S(double x)  const override { return CalcMathRELU::S(x); }
+  public: virtual double SD(double x) const override { return CalcMathRELU::SD(x); }
+  public: static ActFuncRELUTrainee* getInstance() { static ActFuncRELUTrainee s; return &s; }
+};
+
+// Activation : LRELU
+
+const double CalcMathLRELULeak = 0.1; // [0.0..1.0)
+
+class CalcMathLRELU // static provider
+{
+  public: static double S(double x)  { return (x < 0) ? x * CalcMathLRELULeak : x; }
+  public: static double SD(double x) { return (x < 0) ? CalcMathLRELULeak : 1.0; }
+};
+
+class ActFuncLRELU : public ActFunc
+{
+  public: virtual double S(double x) const override { return CalcMathLRELU::S(x); }
+  public: static ActFuncLRELU* getInstance() { static ActFuncLRELU s; return &s; }
+};
+
+class ActFuncLRELUTrainee : public ActFuncTrainee
+{
+  public: virtual double S(double x)  const override { return CalcMathLRELU::S(x); }
+  public: virtual double SD(double x) const override { return CalcMathLRELU::SD(x); }
+  public: static ActFuncLRELUTrainee* getInstance() { static ActFuncLRELUTrainee s; return &s; }
+};
+
+// Activation : Tanh
+
+class CalcMathTanh // static provider
+{
+  public: static double S(double x)  { return std::tanh(x); }
+  public: static double SD(double x) { return 1.0-std::pow(std::tanh(x),2.0); }
+};
+
+class ActFuncTanh : public ActFunc
+{
+  public: virtual double S(double x) const override { return CalcMathTanh::S(x); }
+  public: static ActFuncTanh* getInstance() { static ActFuncTanh s; return &s; }
+};
+
+class ActFuncTanhTrainee : public ActFuncTrainee
+{
+  public: virtual double S(double x)  const override { return CalcMathTanh::S(x); }
+  public: virtual double SD(double x) const override { return CalcMathTanh::SD(x); }
+  public: static ActFuncTanhTrainee* getInstance() { static ActFuncTanhTrainee s; return &s; }
+};
+
+// Default Activation Functions
+
+inline ActFunc*        getDefActFunc()        { return ActFuncSigmoid::getInstance(); }
+inline ActFuncTrainee* getDefActFuncTrainee() { return ActFuncSigmoidTrainee::getInstance(); }
 
 // Neuron types
 
@@ -134,13 +228,13 @@ class ProcNeuron : public BaseNeuron
   public: std::vector<BaseNeuron*> inputs;
   public: std::vector<double> w;
 
+  protected: ActFunc* func = NULL; // just reference, does not "own" the provider
+
   protected: double out = 0.0;
 
   protected: double sum = 0.0; // Used for for training, but kept here to simplify training implemenation
 
-  public: ProcNeuron()
-  {
-  }
+  public: ProcNeuron(ActFunc* func = NULL) : func(func == NULL ? getDefActFunc() : func) { }
 
   protected: double calcOutputSum(const std::vector<double> &ins)
   {
@@ -210,6 +304,8 @@ class ProcNeuron : public BaseNeuron
   // Core proccsing
   // Computes output based on input
 
+  protected: double S(double x) { return func->S(x); }
+
   public: virtual void proc() override
   {
     assert(this->inputs.size() == this->w.size());
@@ -236,9 +332,13 @@ class ProcNeuronTrainee : public ProcNeuron
 {
   // ProcNeurons extension used for training
 
-  public:    std::vector<double> nw;  // for train
+  public: std::vector<double> nw;  // for train
+
+  public: ProcNeuronTrainee(ActFuncTrainee* func = NULL) : ProcNeuron(func == NULL ? getDefActFuncTrainee() : func) { }
 
   // for train
+
+  public: double SD(double x) { auto train = dynamic_cast<ActFuncTrainee*>(func); assert(train != NULL); return train->SD(x); }
 
   public: double getSum()
   {
@@ -304,6 +404,14 @@ template<class T>
 class TheNeuronFactory : public NeuronFactory
 {
   public: virtual BaseNeuron *makeNeuron() override { return new T(); };
+};
+
+template<class T, class A>
+class ExtNeuronFactory : public NeuronFactory
+{
+  protected: A arg;
+  public: ExtNeuronFactory(A arg) : arg(arg) { }
+  public: virtual BaseNeuron* makeNeuron() override { return new T(arg); };
 };
 
 /// Layer
@@ -515,7 +623,7 @@ inline double getDeltaOutputSum(ProcNeuronTrainee *outNeuron, double OSME) // OS
 {
   if (outNeuron == NULL) { return NAN; }
   double OS = outNeuron->getSum();
-  double DOS = SD(OS) * OSME;
+  double DOS = outNeuron->SD(OS) * OSME;
   return(DOS);
 }
 
@@ -553,7 +661,7 @@ inline std::vector<double> getDeltaHiddenSums(ProcNeuronTrainee *theNeuron, doub
     }
     else // looks like SD here is SD for input neuron (?) use input->SD(input->getSum()) later
     {
-      if (DIV_IN_TRAIN) { ds = DOS / theNeuron->w[i] * SD(input->getSum()); } else { ds = DOS * theNeuron->w[i] * SD(input->getSum()); }
+      if (DIV_IN_TRAIN) { ds = DOS / theNeuron->w[i] * input->SD(input->getSum()); } else { ds = DOS * theNeuron->w[i] * input->SD(input->getSum()); }
     }
 
     DHS[i] = ds; // DHS.push_back(ds);
