@@ -24,6 +24,12 @@ template<typename T1> std::string STR(const T1& x) { return console::toString(x)
 const int SAMPLE_OCR_SX = 9;
 const int SAMPLE_OCR_SY = 8;
 
+const double SAMPLE_OCR_INP_VOID  = 0.0;
+const double SAMPLE_OCR_INP_FILL  = 1.0;
+
+const double SAMPLE_OCR_OUT_NONE  = 0.0;
+const double SAMPLE_OCR_OUT_FOUND = 1.0;
+
 inline std::string emptyStr() { return ""; }
 
 std::vector<std::vector<std::vector<double>>> sampleOcrGetSamples()
@@ -148,7 +154,7 @@ std::vector<std::vector<std::vector<double>>> sampleOcrGetSamples()
     {
       for (auto x = 0; x < SAMPLE_OCR_SX; x++)
       {
-        R.push_back(L[y*SAMPLE_OCR_SX+x] == '*' ? 1 : 0);
+        R.push_back(L[y*SAMPLE_OCR_SX+x] == ' ' ? SAMPLE_OCR_INP_VOID : SAMPLE_OCR_INP_FILL);
       }
     }
 
@@ -156,12 +162,13 @@ std::vector<std::vector<std::vector<double>>> sampleOcrGetSamples()
   };
 
   // letters to recognize, each SX * SY size in many samples
-  std::vector<std::vector<std::vector<double>>> I0 = {
-             { getLNArray(IA0), getLNArray(IA1), getLNArray(IA2), },
-             { getLNArray(IB0), getLNArray(IB1) },
-             { getLNArray(IC0), getLNArray(IC1) },
-             { getLNArray(ID0), getLNArray(ID1), getLNArray(ID2) }
-           }; 
+  std::vector<std::vector<std::vector<double>>> I0 = 
+  {
+    { getLNArray(IA0), getLNArray(IA1), getLNArray(IA2), },
+    { getLNArray(IB0), getLNArray(IB1) },
+    { getLNArray(IC0), getLNArray(IC1) },
+    { getLNArray(ID0), getLNArray(ID1), getLNArray(ID2) }
+  };
 
   return(I0);
 }
@@ -181,14 +188,15 @@ std::vector<double> getNoisedInput(const std::vector<double> &L, int noiseCount 
   {
     if (noiseType == NOISE_TYPE_PIXEL_DARKER_LIGHTER)
     {
-      if (value <= 0) { return(NN::Internal::getRandom(0.0 , 0.49)); }
-      if (value >= 1) { return(NN::Internal::getRandom(0.51, 1.0 )); }
+      auto HALF = (SAMPLE_OCR_INP_VOID + SAMPLE_OCR_INP_FILL) / 2.0;
+      if (value <  HALF) { return(NN::Internal::getRandom(std::min(SAMPLE_OCR_INP_VOID, SAMPLE_OCR_INP_FILL), HALF - 0.1)); }
+      if (value >= HALF) { return(NN::Internal::getRandom(HALF + 0.1, std::max(SAMPLE_OCR_INP_VOID, SAMPLE_OCR_INP_FILL))); }
       return(value);
     }
 
     if (noiseType == NOISE_TYPE_PIXEL_RANDOM)
     {
-      return(NN::Internal::getRandom(0.0,1.0));
+      return(NN::Internal::getRandom(std::min(SAMPLE_OCR_INP_VOID, SAMPLE_OCR_INP_FILL), std::max(SAMPLE_OCR_INP_VOID, SAMPLE_OCR_INP_FILL)));
     }
 
     return(1-value); // flip pixel
@@ -313,6 +321,8 @@ std::vector<std::string> sampleAddLetTexts(const std::vector<double> &L, std::ve
 
 bool sampleOcrNetwork()
 {
+  bool testResult = true;
+
   // The Dataset
 
   if (true)
@@ -327,7 +337,7 @@ bool sampleOcrNetwork()
 
   for (size_t dataIndex = 0; dataIndex < SAMPLES.size(); dataIndex++)
   {
-    auto RESULT = NN::NetworkStat::getR1Array(dataIndex,SAMPLES.size()); // target result for this letter
+    auto RESULT = NN::NetworkStat::getR1Array(dataIndex,SAMPLES.size(), SAMPLE_OCR_OUT_FOUND, SAMPLE_OCR_OUT_NONE); // target result for this letter
     RESULTS.push_back(RESULT);
   }
 
@@ -343,19 +353,22 @@ bool sampleOcrNetwork()
     console::log("sampleOcrNetwork", "(net)", "seed=", seed, "layers=", LAYERS);
   }
 
+  ActFuncTrainee* actFunc = NN::ActFuncSigmoidTrainee::getInstance();
+  ActFuncTrainee* outFunc = NN::ActFuncSigmoidTrainee::getInstance();
+
   if (LAYERS == 3)
   {
     auto IN  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY, NN::TheNeuronFactory<NN::InputNeuron>()); IN->addNeurons(1,NN::TheNeuronFactory<NN::BiasNeuron>());
-    auto L1  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY*1, NN::TheNeuronFactory<NN::ProcNeuronTrainee>()); L1->addNeurons(1,NN::TheNeuronFactory<NN::BiasNeuron>()); L1->addInputAll(IN);
-    auto OUT = new NN::Layer(SAMPLES.size(), NN::TheNeuronFactory<NN::ProcNeuronTrainee>()); OUT->addInputAll(L1); // Outputs: 0=A, 1=B, 2=C, ...
+    auto L1  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY*1, NN::ExtNeuronFactory<NN::ProcNeuronTrainee,NN::ActFuncTrainee*>(actFunc)); L1->addNeurons(1,NN::TheNeuronFactory<NN::BiasNeuron>()); L1->addInputAll(IN);
+    auto OUT = new NN::Layer(SAMPLES.size(), NN::ExtNeuronFactory<NN::ProcNeuronTrainee, NN::ActFuncTrainee*>(outFunc)); OUT->addInputAll(L1); // Outputs: 0=A, 1=B, 2=C, ...
     NET.addLayer(IN); NET.addLayer(L1); NET.addLayer(OUT);
   }
   else
   {
     auto IN  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY, NN::TheNeuronFactory<NN::InputNeuron>()); IN->addNeurons(1,NN::TheNeuronFactory<NN::BiasNeuron>());
-    auto L1  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY*1, NN::TheNeuronFactory<NN::ProcNeuronTrainee>()); L1->addNeurons(1,NN::TheNeuronFactory<NN::BiasNeuron>()); L1->addInputAll(IN);
-    auto L2  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY, NN::TheNeuronFactory<NN::ProcNeuronTrainee>()); L2->addNeurons(1,NN::TheNeuronFactory<NN::BiasNeuron>()); L2->addInputAll(L1);
-    auto OUT = new NN::Layer(SAMPLES.size(), NN::TheNeuronFactory<NN::ProcNeuronTrainee>()); OUT->addInputAll(L2); // Outputs: 0=A, 1=B, 2=C, ...
+    auto L1  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY*1, NN::ExtNeuronFactory<NN::ProcNeuronTrainee,NN::ActFuncTrainee*>(actFunc)); L1->addNeurons(1,NN::TheNeuronFactory<NN::BiasNeuron>()); L1->addInputAll(IN);
+    auto L2  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY, NN::ExtNeuronFactory<NN::ProcNeuronTrainee,NN::ActFuncTrainee*>(actFunc)); L2->addNeurons(1,NN::TheNeuronFactory<NN::BiasNeuron>()); L2->addInputAll(L1);
+    auto OUT = new NN::Layer(SAMPLES.size(), NN::ExtNeuronFactory<NN::ProcNeuronTrainee,NN::ActFuncTrainee*>(outFunc)); OUT->addInputAll(L2); // Outputs: 0=A, 1=B, 2=C, ...
     NET.addLayer(IN); NET.addLayer(L1); NET.addLayer(L2); NET.addLayer(OUT);
   }
 
@@ -436,13 +449,13 @@ bool sampleOcrNetwork()
   // Training
 
   console::log("Training, please wait ...");
-  if (!NN::doTrain(NET, DATAS, TARGS, -1, -1, &NN::TrainingProgressReporterConsole(10)))
+  if (!NN::doTrain(NET, DATAS, TARGS, 0.125, 10000, &NN::TrainingProgressReporterConsole(10), &NN::TrainingDoneCheckerEps(0.2)))
   {
-    console::log("Training failed!", NET.layers);
-    return(false);
+    console::log("Training failed (does not to achieve loss error margin?)", NET.layers);
+    testResult = false;
   }
 
-  console::log("Training complete", NET.layers);
+  console::log("Training finished", NET.layers);
 
   // Verification
 
@@ -540,7 +553,7 @@ bool sampleOcrNetwork()
 
   // Verify on source dataset (dry run)
 
-  verifyProc(NET, DATAS, TARGS, "Source", DATAS.size() / DATASE.size());
+  testResult = verifyProc(NET, DATAS, TARGS, "Source", DATAS.size() / DATASE.size()) && testResult;
 
   // Create noised data
 
@@ -551,25 +564,23 @@ bool sampleOcrNetwork()
   {
     DATASN.push_back(getNoisedInput(DATAS[dataIndex],1));
   }
-
-  verifyProc(NET, DATASN, TARGS, "Noised.F1", DATASN.size() / DATASE.size());
+  testResult = verifyProc(NET, DATASN, TARGS, "Noised.F1", DATASN.size() / DATASE.size()) && testResult;
 
   DATASN.clear();
   for (size_t dataIndex = 0; dataIndex < DATAS.size(); dataIndex++)
   {
     DATASN.push_back(getNoisedInput(DATAS[dataIndex],30,NOISE_TYPE_PIXEL_DARKER_LIGHTER));
   }
-
-  verifyProc(NET, DATASN, TARGS, "Noised.DL30", DATASN.size() / DATASE.size());
+  testResult = verifyProc(NET, DATASN, TARGS, "Noised.DL30", DATASN.size() / DATASE.size()) && testResult;
 
   DATASN.clear();
   for (size_t dataIndex = 0; dataIndex < DATAS.size(); dataIndex++)
   {
     DATASN.push_back(getNoisedInput(DATAS[dataIndex],10,NOISE_TYPE_PIXEL_RANDOM));
   }
+  testResult = verifyProc(NET, DATASN, TARGS, "Noised.R10", DATASN.size() / DATASE.size()) && testResult;
 
-  verifyProc(NET, DATASN, TARGS, "Noised.R10", DATASN.size() / DATASE.size());
-  return(true);
+  return(testResult);
 }
 
 } } // NN::Demo
