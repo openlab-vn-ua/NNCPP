@@ -18,26 +18,27 @@ namespace NN {
 
 // Public constants / params
 
-// Use "/" instead of * during train. Used in unit tests only, should be false on production
-extern bool DIV_IN_TRAIN;
-
 // Tools
 
 namespace Internal {
 
-//var PRNG = new Random(1363990714); // would not train on 2+1 -> 2+1 -> 1 configuration
-extern Random PRNG; // PRNG = new Random(new Date().getTime());
+inline Random* getPRNG()
+{
+  //var PRNG = new Random(1363990714); // would not train on 2+1 -> 2+1 -> 1 configuration
+  static Random PRNG; // PRNG = new Random(new Date().getTime());
+  return(&PRNG);
+}
 
 // Return random float in range [min..max] inclusive
 inline double getRandom (double min, double max)
 {
-  return (PRNG.randFloat(min, max));
+  return (getPRNG()->randFloat(min, max));
 }
 
 // Return integer in range [from..limit) :: from-inclusive, limit-exclusive
 inline int32_t getRandomInt (int32_t from, int32_t limit)
 {
-  return ((int)std::floor((PRNG.nextFloat() * (limit - from)) + from)) % limit; // TODO: Verify me
+  return ((int)std::floor((getPRNG()->nextFloat() * (limit - from)) + from)) % limit; // TODO: Verify me
 }
 
 // Return integer in range [0, limit) :: 0-inclusive, limit-exclusive
@@ -77,8 +78,8 @@ class ActFuncTrainee : public ActFunc
 
 class CalcMathSigmoid // static provider
 {
-  public: static double S(double x)  { return(1.0 / (1.0 + exp(-x))); } // S is sigmoid function
-  public: static double SD(double x) { return(std::exp(x) / std::pow(1.0 + std::exp(x), 2)); } // S derivative AKA S' AKA dS/dX // e^x/(1 + e^x)^2
+  public: static double S(double x)  { return(1.0 / (1.0 + exp(-x))); } // S is sigmoid function // DEF: y=1/(1+exp(-x))
+  public: static double SD(double x) { return(std::exp(x) / std::pow(1.0 + std::exp(x), 2)); } // S derivative AKA S' AKA dS/dX // DEF: y=e^x/(1 + e^x)^2
 };
 
 class ActFuncSigmoid : public ActFunc
@@ -167,23 +168,27 @@ inline ActFuncTrainee* getDefActFuncTrainee() { return ActFuncSigmoidTrainee::ge
 // Neuron types
 
 // Neuron have to have following functions:
-// // Base                                                        Input             Normal             Bias  
-// .get()                        - to provide its current result  value of .set     result of .proc    1.0
-// .proc()                       - to proccess data on its input  [ignored]         do proc inp links  [ignored]
+// // Base                                                        Input             Normal               Bias  
+// .get()                        - to provide its current result  value of .set     result of .proc      1.0
+// .proc()                       - to proccess data on its input  [ignored]         do proc inp links    [ignored]
 // // Input
-// .set(inp)                     - to assing input value          assing inp value  [N/A]              [N/A]
+// .set(inp)                     - to assing input value          assing inp value  [N/A]                [N/A]
 // // Proc
-// .inputs[] (used for train)    - current input Neurons links    [N/A]             [input link count] [] // empty
-// .w[]      (used for train)    - current input Neurons weights  [N/A]             [input link count] [] // empty
+// .inputs[] (used for train)    - current input Neurons links    [N/A]             [input link count]   [N/A]
+// .w[]      (used for train)    - current input Neurons weights  [N/A]             [input link count]   [N/A]
 // // Construction
-// .addInput(Neuron,weight)      - add input link to Neuron       [N/A]             add input link     [ignored]
-// .addInputAll(Neurons,weights) - add input link to Neurons      [N/A]             add input links    [ignored]
-// // Train
-// .getSum()                     - raw sum of all inputs before S [N/A]             sum of .proc       1.0
-// .nw[]                         - new input Neurons weights      [N/A]             [input link count] [] // empty
-// .initNewWeights()             - init new  weights (.nw) array  [N/A]             copy .w to .nw     [ignored]
-// .addNewWeightsDelta(DW)       - adds DW to new  weights (.nw)  [N/A]             add dw to .nw      [ignored]
-// .applyNewWeights()            - adds DW to new  weights (.nw)  [N/A]             copy .nw to .w     [ignored]
+// .addInput(Neuron,weight)      - add input link to Neuron       [N/A]             add input link       [N/A]
+// .addInputAll(Neurons,weights) - add input link to Neurons      [N/A]             add input links      [N/A]
+// // Trainee
+// .getSum()                     - raw sum of all inputs before S [N/A]             sum of .proc         [N/A]
+// .nw[]                         - new input Neurons weights      [N/A]             [input link count]   [N/A]
+// .initTrainStep()              - init new  weights (.nw) array  [N/A]             .nw[]=.w[], .dos=0   [N/A]
+// .addNewWeightsDelta(DW)       - adds DW to new  weights (.nw)  [N/A]             .nw[] += DW[]        [N/A]
+// .applyNewWeights()            - adds DW to new  weights (.nw)  [N/A]             .w[]=.nw[]           [N/A]
+// // Trainee // FAST
+// .dos                          - accumulated delta out sum      [N/A]             accumulated dos      [N/A]
+// .addDeltaOutputSum(ddos)      - increments dos for neuron      [N/A]             .dos+ddos            [N/A]
+// .getDeltaOutputSum()          - return dos for neuron          [N/A]             return .dos          [N/A]
 
 class BaseNeuron : protected NonAssignable
 {
@@ -215,11 +220,6 @@ class InputNeuron : public BaseNeuron
   }
 };
 
-inline double getRandomInitWeight()
-{
-  return(getRandom(-1, 1));
-}
-
 // Proc Neuron
 // Neuron that proccess its input inside proc method
 
@@ -235,6 +235,26 @@ class ProcNeuron : public BaseNeuron
   protected: double sum = 0.0; // Used for for training, but kept here to simplify training implemenation
 
   public: ProcNeuron(ActFunc* func = NULL) : func(func == NULL ? getDefActFunc() : func) { }
+
+  protected: double getRandomInitWeight()
+  {
+    return(getRandom(-1, 1));
+  }
+
+  protected: double getRandomInitWeightForNNeurons(int n)
+  {
+    // Select input range of w. for n neurons
+    // Simple range is -1..1,
+    // But we may try - 1/sqrt(n)..1/sqrt(n) to reduce range of w in case of many inputs (so act func will not saturate)
+    double wrange = 1;
+
+    if (n > 0)
+    {
+      wrange = 1.0/std::sqrt(n);
+    }
+
+    return (getRandom(-wrange, wrange));
+  }
 
   protected: double calcOutputSum(const std::vector<double> &ins)
   {
@@ -269,7 +289,7 @@ class ProcNeuron : public BaseNeuron
     {
       if (weights == NULL)
       {
-        addInput(neurons[i]);
+        addInput(neurons[i], getRandomInitWeightForNNeurons(count));
       }
       else
       {
@@ -286,7 +306,7 @@ class ProcNeuron : public BaseNeuron
     {
       if (i >= weightsCount)
       {
-        addInput(neurons[i]);
+        addInput(neurons[i], getRandomInitWeightForNNeurons(count));
       }
       else
       {
@@ -332,23 +352,17 @@ class ProcNeuronTrainee : public ProcNeuron
 {
   // ProcNeurons extension used for training
 
-  public: std::vector<double> nw;  // for train
-
   public: ProcNeuronTrainee(ActFuncTrainee* func = NULL) : ProcNeuron(func == NULL ? getDefActFuncTrainee() : func) { }
 
-  // for train
+  // Main training
 
   public: double SD(double x) { auto train = dynamic_cast<ActFuncTrainee*>(func); assert(train != NULL); return train->SD(x); }
+
+  public: std::vector<double> nw; // new weights for train
 
   public: double getSum()
   {
     return(this->sum);
-  }
-
-  public: void initNewWeights()
-  {
-    //this->nw.assign(this->w.begin(), this->w.end());
-    this->nw = this->w;
   }
 
   public: void addNewWeightsDelta(const double dw[])
@@ -373,12 +387,41 @@ class ProcNeuronTrainee : public ProcNeuron
     }
   }
 
-  // Replace current weights with new weights
-
-  public: void applyNewWeights()
+  public: void applyNewWeights() // Replace current weights with new weights
   {
     //this->w.assign(this->nw.begin(), this->nw.end());
     this->w = this->nw;
+  }
+
+  protected: void initTrainStepMain()
+  {
+    //this->nw.assign(this->w.begin(), this->w.end());
+    this->nw = this->w;
+  }
+
+  // Fast training
+
+  public: double dos = 0.0; // for train (delta output sum)
+
+  public: void addDeltaOutputSum(double ddos)
+  {
+    this->dos += ddos;
+  }
+
+  public: double getDeltaOutputSum()
+  {
+    return this->dos;
+  }
+
+  protected: void initTrainStepFast()
+  {
+    this->dos = 0.0;
+  }
+
+  public: void initTrainStep()
+  {
+    initTrainStepMain();
+    initTrainStepFast();
   }
 };
 
@@ -618,59 +661,6 @@ inline std::vector<double> doProc(Network* NET, const std::vector<double>& input
 inline std::vector<double> doProc(Network* NET, const std::vector<double>* inputs)
 {
   return doProc(*NET, *inputs);
-}
-
-// Training functions
-
-inline double getDeltaOutputSum(ProcNeuronTrainee *outNeuron, double OSME) // OSME = output sum margin of error (AKA Expected - Calculated)
-{
-  if (outNeuron == NULL) { return NAN; }
-  double OS = outNeuron->getSum();
-  double DOS = outNeuron->SD(OS) * OSME;
-  return(DOS);
-}
-
-inline std::vector<double> getDeltaWeights(ProcNeuronTrainee *theNeuron, double DOS) // theNeuron in question, DOS = delta output sum
-{
-  if (theNeuron == NULL) { return std::vector<double>(); } // Empty
-
-  size_t count = theNeuron->inputs.size();
-  std::vector<double> DWS(count); // reserve capacity, so we do not need push_back
-
-  double dw;
-  for (size_t i = 0; i < count; i++)
-  {
-    if (DIV_IN_TRAIN) { dw = DOS / theNeuron->inputs[i]->get(); } else { dw = DOS * theNeuron->inputs[i]->get(); }
-    DWS[i] = dw; // DWS.push_back(dw);
-  }
-
-  return(DWS);
-}
-
-inline std::vector<double> getDeltaHiddenSums(ProcNeuronTrainee *theNeuron, double DOS) // theNeuron in question, DOS = delta output sum
-{
-  if (theNeuron == NULL) { return std::vector<double>(); } // Empty
-
-  size_t count = theNeuron->inputs.size();
-  std::vector<double> DHS(count); // reserve capacity, so we do not need push_back
-
-  double ds;
-  for (size_t i = 0; i < count; i++)
-  {
-    auto input = dynamic_cast<ProcNeuronTrainee*>(theNeuron->inputs[i]);
-    if (input == NULL)
-    {
-      ds = NAN; // This neuron input is non-trainee neuron, ds is N/A since we do not know its getSum()
-    }
-    else // looks like SD here is SD for input neuron (?) use input->SD(input->getSum()) later
-    {
-      if (DIV_IN_TRAIN) { ds = DOS / theNeuron->w[i] * input->SD(input->getSum()); } else { ds = DOS * theNeuron->w[i] * input->SD(input->getSum()); }
-    }
-
-    DHS[i] = ds; // DHS.push_back(ds);
-  }
-
-  return(DHS);
 }
 
 // Network Stat and Math functionality
@@ -986,109 +976,303 @@ namespace NetworkStat // static class
 // -----------------------------------------------
 // Do network train
 
-inline void doTrainStepProcPrevLayer(std::vector<BaseNeuron*> &LOUT, std::vector<double> &DOS, int layerIndex)
+// Base class for training alogorith implemenation
+
+class NetworkTrainer
 {
-  // Addjust previous layer(s)
-  // LOUT[neurons count] = current level (its new weights already corrected)
-  // DOS[neurons count]  = delta output sum for each neuron on in current level
-  // layerIndex = current later index, where 0 = input layer
+  public: virtual void trainInit(Network& NET) { }
+  public: virtual void trainStep(Network& NET, const std::vector<double>& DATA, const std::vector<double>& TARG, double speed) = 0;
+  public: virtual void trainDone(Network& NET) { }
+};
 
-  assert(LOUT.size() == DOS.size());
+// Back propagation training alogorithm implemenation
 
-  if (layerIndex <= 1)
+class NetworkTrainerBackProp : public NetworkTrainer
+{
+  // Use "/" instead of * during train. Used in unit tests only, should be false on production
+  public: bool DIV_IN_TRAIN = false;
+
+  public: double getDeltaOutputSum(ProcNeuronTrainee* outNeuron, double osme) // osme = output sum margin of error (AKA Expected - Calculated)
   {
-    return; // previous layer is an input layer, so skip any action
+    if (outNeuron == NULL) { return NAN; }
+    double OS = outNeuron->getSum();
+    double DOS = outNeuron->SD(OS) * osme;
+    return(DOS);
   }
 
-  for (size_t i = 0; i < LOUT.size(); i++)
+  public: std::vector<double> getDeltaWeights(ProcNeuronTrainee* theNeuron, double dos) // theNeuron in question, dos = delta output sum
   {
-    auto neuron = dynamic_cast<ProcNeuronTrainee *>(LOUT[i]);
+    if (theNeuron == NULL) { return std::vector<double>(); } // Empty
 
-    if (neuron == NULL) { break; } // Non-trainable neuron
+    size_t count = theNeuron->inputs.size();
+    std::vector<double> DWS(count); // reserve capacity, so we do not need push_back
 
-    auto &LP = neuron->inputs;
-    auto DOHS = getDeltaHiddenSums(neuron, DOS[i]);
-
-    assert(LP.size() == DOHS.size());
-
-    for (size_t ii = 0; ii < LP.size(); ii++)
+    double dw;
+    for (size_t i = 0; i < count; i++)
     {
-      auto input = dynamic_cast<ProcNeuronTrainee *>(LP[ii]);
-      if (input != NULL)
+      if (DIV_IN_TRAIN) { dw = dos / theNeuron->inputs[i]->get(); } else { dw = dos * theNeuron->inputs[i]->get(); }
+      DWS[i] = dw; // DWS.push_back(dw);
+    }
+
+    return(DWS);
+  }
+
+  public: std::vector<double> getDeltaHiddenSums(ProcNeuronTrainee* theNeuron, double dos) // theNeuron in question, dos = delta output sum
+  {
+    if (theNeuron == NULL) { return std::vector<double>(); } // Empty
+
+    size_t count = theNeuron->inputs.size();
+    std::vector<double> DHS(count); // reserve capacity, so we do not need push_back
+
+    double ds;
+    for (size_t i = 0; i < count; i++)
+    {
+      auto input = dynamic_cast<ProcNeuronTrainee*>(theNeuron->inputs[i]);
+      if (input == NULL)
       {
-        auto DW = getDeltaWeights(input, DOHS[ii]);
-        input->addNewWeightsDelta(DW);
+        ds = NAN; // This neuron input is non-trainee neuron, ds is N/A since we do not know its getSum()
+      }
+      else // looks like SD here is SD for input neuron (?) use input->SD(input->getSum()) later
+      {
+        if (DIV_IN_TRAIN) { ds = dos / theNeuron->w[i] * input->SD(input->getSum()); } else { ds = dos * theNeuron->w[i] * input->SD(input->getSum()); }
+      }
+
+      DHS[i] = ds; // DHS.push_back(ds);
+    }
+
+    return(DHS);
+  }
+
+  protected: void doTrainStepProcPrevLayer(std::vector<BaseNeuron*> &LOUT, std::vector<double> &DOS, int layerIndex)
+  {
+    // Addjust previous layer(s)
+    // LOUT[neurons count] = current level (its new weights already corrected)
+    // DOS[neurons count]  = delta output sum for each neuron on in current level
+    // layerIndex = current later index, where 0 = input layer
+
+    assert(LOUT.size() == DOS.size());
+
+    if (layerIndex <= 1)
+    {
+      return; // previous layer is an input layer, so skip any action
+    }
+
+    for (size_t i = 0; i < LOUT.size(); i++)
+    {
+      auto neuron = dynamic_cast<ProcNeuronTrainee *>(LOUT[i]);
+
+      if (neuron == NULL) { break; } // Non-trainable neuron
+
+      auto &LP = neuron->inputs;
+      auto DOHS = getDeltaHiddenSums(neuron, DOS[i]);
+
+      assert(LP.size() == DOHS.size());
+
+      for (size_t ii = 0; ii < LP.size(); ii++)
+      {
+        auto input = dynamic_cast<ProcNeuronTrainee *>(LP[ii]);
+        if (input != NULL)
+        {
+          auto DW = getDeltaWeights(input, DOHS[ii]);
+          input->addNewWeightsDelta(DW);
+        }
+      }
+
+      doTrainStepProcPrevLayer(LP, DOHS, layerIndex-1);
+    }
+  }
+
+  public: virtual void trainStep(Network &NET, const std::vector<double> &DATA, const std::vector<double> &TARG, double speed) override
+  {
+    // NET=network, DATA=input, TARG=expeted
+    // CALC=calculated output (will be calculated)
+    // Note: we re-run calculation here both to receive CALC AND update "sum" state of each neuron in NET
+
+    if (std::isnan(speed) ||  (speed <= 0.0)) { speed = 0.1; } // 1.0 is max
+
+    auto CALC = doProc(NET, DATA); // we need this because sum has to be updated in NET for each neuron for THIS test case
+
+    for (size_t i = 1; i < NET.layers.size(); i++) // skip input layer
+    {
+      auto iicount = NET.layers[i]->neurons.size();
+      for (size_t ii = 0; ii < iicount; ii++)
+      {
+        auto neuron = dynamic_cast<ProcNeuronTrainee *>(NET.layers[i]->neurons[ii]);
+        if (neuron != NULL)
+        {
+          neuron->initTrainStep(); // prepare
+        }
       }
     }
 
-    doTrainStepProcPrevLayer(LP, DOHS, layerIndex-1);
-  }
-}
+    // Output layer (special handling)
 
-inline void doTrainStep(Network &NET, const std::vector<double> &DATA, const std::vector<double> &TARG, double SPEED)
-{
-  // NET=network, DATA=input, TARG=expeted
-  // CALC=calculated output (will be calculated)
-  // Note: we re-run calculation here both to receive CALC AND update "sum" state of each neuron in NET
+    auto &LOUT = NET.layers[NET.layers.size()-1]->neurons;
 
-  if (std::isnan(SPEED) ||  (SPEED <= 0.0)) { SPEED = 0.1; } // 1.0 is max
+    std::vector<double> OSME; // output sum margin of error (AKA Expected - Calculated) for each output
+    std::vector<double> DOS ; // delta output sum for each output neuron
+    std::vector<std::vector<double>> DOIW; // delta output neuron input weights each output neuron
 
-  auto CALC = doProc(NET, DATA); // we need this because sum has to be updated in NET for each neuron for THIS test case
+    // proc output layer
 
-  for (size_t i = 1; i < NET.layers.size(); i++) // skip input layer
-  {
-    auto iicount = NET.layers[i]->neurons.size();
-    for (size_t ii = 0; ii < iicount; ii++)
+    for (size_t i = 0; i < LOUT.size(); i++)
     {
-      auto neuron = dynamic_cast<ProcNeuronTrainee *>(NET.layers[i]->neurons[ii]);
+      auto neuron = dynamic_cast<ProcNeuronTrainee *>(LOUT[i]);
+      OSME.push_back((TARG[i] - CALC[i]) * speed);
+      DOS.push_back(getDeltaOutputSum(neuron, OSME[i])); // will handle neuron=NULL case
+      DOIW.push_back(getDeltaWeights(neuron, DOS[i])); // will handle neuron=NULL case
       if (neuron != NULL)
       {
-        neuron->initNewWeights(); // prepare
+        neuron->addNewWeightsDelta(DOIW[i]);
       }
     }
-  }
 
-  // Output layer (special handling)
+    // proc prev layers
+    // will apply training back recursively
+    // recursion controlled by laterIndex
 
-  auto &LOUT = NET.layers[NET.layers.size()-1]->neurons;
+    doTrainStepProcPrevLayer(LOUT, DOS, NET.layers.size()-1);
 
-  std::vector<double> OSME; // output sum margin of error (AKA Expected - Calculated) for each output
-  std::vector<double> DOS ; // delta output sum for each output neuron
-  std::vector<std::vector<double>> DOIW; // delta output neuron input weights each output neuron
-
-  // proc output layer
-
-  for (size_t i = 0; i < LOUT.size(); i++)
-  {
-    auto neuron = dynamic_cast<ProcNeuronTrainee *>(LOUT[i]);
-    OSME.push_back((TARG[i] - CALC[i]) * SPEED);
-    DOS.push_back(getDeltaOutputSum(neuron, OSME[i])); // will handle neuron=NULL case
-    DOIW.push_back(getDeltaWeights(neuron, DOS[i])); // will handle neuron=NULL case
-    if (neuron != NULL)
+    for (size_t i = 1; i < NET.layers.size(); i++) // skip input layer
     {
-      neuron->addNewWeightsDelta(DOIW[i]);
-    }
-  }
-
-  // proc prev layers
-  // will apply training back recursively
-  // recursion controlled by laterIndex
-
-  doTrainStepProcPrevLayer(LOUT, DOS, NET.layers.size()-1);
-
-  for (size_t i = 1; i < NET.layers.size(); i++) // skip input layer
-  {
-    auto iicount = NET.layers[i]->neurons.size();
-    for (size_t ii = 0; ii < iicount; ii++)
-    {
-      auto neuron = dynamic_cast<ProcNeuronTrainee *>(NET.layers[i]->neurons[ii]);
-      if (neuron != NULL)
+      auto iicount = NET.layers[i]->neurons.size();
+      for (size_t ii = 0; ii < iicount; ii++)
       {
-        neuron->applyNewWeights(); // adjust
+        auto neuron = dynamic_cast<ProcNeuronTrainee *>(NET.layers[i]->neurons[ii]);
+        if (neuron != NULL)
+        {
+          neuron->applyNewWeights(); // adjust
+        }
       }
     }
   }
-}
+};
+
+// Back propagation training alogorithm implemenation (Fast)
+
+class NetworkTrainerBackPropFast : public NetworkTrainer
+{
+  // Use "/" instead of * during train. Used in unit tests only, should be false on production
+  public: bool DIV_IN_TRAIN = false;
+  
+  protected: void addDeltaOutputSum(ProcNeuronTrainee* outNeuron, double osme) // osme = output sum margin of error (AKA Expected - Calculated) // FAST
+  {
+    if (outNeuron == NULL) { return; }
+    double dos = outNeuron->SD(outNeuron->getSum()) * osme;
+    outNeuron->addDeltaOutputSum(dos);
+  }
+
+  protected: void addDeltaWeights(ProcNeuronTrainee* theNeuron, double dos) // theNeuron in question, dos = delta output sum // FAST
+  {
+    if (theNeuron == NULL) { return; } // Empty
+
+    size_t count = theNeuron->inputs.size();
+
+    double dw;
+    for (size_t i = 0; i < count; i++)
+    {
+      if (DIV_IN_TRAIN) { dw = dos / theNeuron->inputs[i]->get(); } else { dw = dos * theNeuron->inputs[i]->get(); }
+      theNeuron->nw[i] = theNeuron->nw[i] + dw;
+    }
+  }
+
+  protected: void addDeltaHiddenSums(ProcNeuronTrainee* theNeuron, double dos) // FAST
+  {
+    if (theNeuron == NULL) { return; } // Empty
+
+    size_t count = theNeuron->inputs.size();
+
+    double ds;
+    for (size_t i = 0; i < count; i++)
+    {
+      auto input = dynamic_cast<ProcNeuronTrainee*>(theNeuron->inputs[i]);
+      if (input == NULL)
+      {
+        // This neuron input is non-trainee neuron, ds is N/A since we do not know its getSum()
+      }
+      else // looks like SD here is SD for input neuron (?) use input->SD(input->getSum()) later
+      {
+        if (DIV_IN_TRAIN) { ds = dos / theNeuron->w[i] * input->SD(input->getSum()); } else { ds = dos * theNeuron->w[i] * input->SD(input->getSum()); }
+        input->addDeltaOutputSum(ds);
+      }
+    }
+  }
+
+  public: virtual void trainStep(Network &NET, const std::vector<double> &DATA, const std::vector<double> &TARG, double speed) override
+  {
+    // NET=network, DATA=input, TARG=expeted
+    // CALC=calculated output (will be calculated)
+    // Note: we re-run calculation here both to receive CALC AND update "sum" state of each neuron in NET
+
+    if (std::isnan(speed) ||  (speed <= 0.0)) { speed = 0.1; } // 1.0 is max
+
+    auto CALC = doProc(NET, DATA); // we need this because sum has to be updated in NET for each neuron for THIS test case
+
+    for (size_t i = 1; i < NET.layers.size(); i++) // skip input layer
+    {
+      auto iicount = NET.layers[i]->neurons.size();
+      for (size_t ii = 0; ii < iicount; ii++)
+      {
+        auto neuron = dynamic_cast<ProcNeuronTrainee *>(NET.layers[i]->neurons[ii]);
+        if (neuron != NULL)
+        {
+          neuron->initTrainStep(); // prepare
+        }
+      }
+    }
+
+    // proc output layer (special handling)
+
+    if (NET.layers.size() > 0)
+    {
+      auto &LOUT = NET.layers[NET.layers.size()-1]->neurons;
+
+      for (size_t i = 0; i < LOUT.size(); i++)
+      {
+        auto neuron = dynamic_cast<ProcNeuronTrainee *>(LOUT[i]);
+        if (neuron != NULL)
+        {
+          double osme = (TARG[i] - CALC[i]) * speed;
+          addDeltaOutputSum(neuron, osme);
+          addDeltaWeights(neuron, neuron->getDeltaOutputSum());
+          addDeltaHiddenSums(neuron, neuron->getDeltaOutputSum());
+        }
+      }
+    }
+
+    // proc hidden layers, skip input layer
+
+    for (int li = NET.layers.size() - 2; li > 0; li--)
+    {
+      auto& LOUT = NET.layers[li]->neurons;
+
+      for (size_t i = 0; i < LOUT.size(); i++)
+      {
+        auto neuron = dynamic_cast<ProcNeuronTrainee*>(LOUT[i]);
+        if (neuron != NULL)
+        {
+          addDeltaWeights(neuron, neuron->getDeltaOutputSum());
+          addDeltaHiddenSums(neuron, neuron->getDeltaOutputSum());
+        }
+      }
+    }
+
+    for (size_t i = 1; i < NET.layers.size(); i++) // skip input layer
+    {
+      auto iicount = NET.layers[i]->neurons.size();
+      for (size_t ii = 0; ii < iicount; ii++)
+      {
+        auto neuron = dynamic_cast<ProcNeuronTrainee*>(NET.layers[i]->neurons[ii]);
+        if (neuron != NULL)
+        {
+          neuron->applyNewWeights(); // adjust
+        }
+      }
+    }
+  }
+};
+
+inline NetworkTrainer* getDefTrainer() { static NetworkTrainerBackPropFast defTrainer;  return &defTrainer; }
 
 /// Class checker for training is done
 
@@ -1197,22 +1381,26 @@ const int    DEFAULT_TRAIN_COUNT    = 50000;
 const double DEFAULT_TRAINING_SPEED = 0.125;
 
 /// Train the neural network
-inline bool doTrain(Network &NET, const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, double SPEED = -1, int MAX_N = -1, TrainingProgressReporter *progressReporter = NULL, TrainingDoneChecker *isTrainingDoneChecker = NULL)
+inline bool doTrain(Network &NET, const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, double speed = -1, int MaxN = -1, TrainingProgressReporter *progressReporter = NULL, TrainingDoneChecker *isTrainingDoneChecker = NULL, NetworkTrainer *trainer = NULL)
 {
-  if (MAX_N < 0)       { MAX_N = DEFAULT_TRAIN_COUNT; }
-  if (SPEED < 0)       { SPEED = DEFAULT_TRAINING_SPEED; }
+  if (MaxN < 0)        { MaxN  = DEFAULT_TRAIN_COUNT; }
+  if (speed < 0)       { speed = DEFAULT_TRAINING_SPEED; }
 
   TrainingDoneCheckerEps isTrainingDoneCheckerDefault;
 
   if (isTrainingDoneChecker == NULL) { isTrainingDoneChecker = &isTrainingDoneCheckerDefault; }
 
-  TrainingProgressReporter::TrainingArgs trainArgs(NET, DATAS, TARGS, SPEED, MAX_N);
+  if (trainer == NULL) { trainer = getDefTrainer(); }
+
+  TrainingProgressReporter::TrainingArgs trainArgs(NET, DATAS, TARGS, speed, MaxN);
 
   if (progressReporter != NULL) { progressReporter->onTrainingBegin(&trainArgs); }
 
+  trainer->trainInit(NET);
+
   // steps
   bool isDone = false;
-  for (int n = 0; (n < MAX_N) && (!isDone); n++)
+  for (int n = 0; (n < MaxN) && (!isDone); n++)
   {
     std::vector<std::vector<double>> CALCS;
     for (size_t s = 0; s < DATAS.size(); s++)
@@ -1238,10 +1426,12 @@ inline bool doTrain(Network &NET, const std::vector<std::vector<double>> &DATAS,
     {
       for (size_t s = 0; s < DATAS.size(); s++)
       {
-        doTrainStep(NET, DATAS[s], TARGS[s], SPEED);
+        trainer->trainStep(NET, DATAS[s], TARGS[s], speed);
       }
     }
   }
+
+  trainer->trainDone(NET);
 
   if (progressReporter != NULL)
   { 
@@ -1269,12 +1459,9 @@ inline bool doTrain(Network* NET, const std::vector<std::vector<double>>* DATAS,
 // Some internals (Similar API to JS version)
 
 NN.Internal = {};
-NN.Internal.PRNG = PRNG;
+NN.Internal.getPRNG = getPRNG;
 NN.Internal.getRandom = getRandom;
 NN.Internal.getRandomInt = getRandomInt;
-NN.Internal.getDeltaOutputSum  = getDeltaOutputSum;
-NN.Internal.getDeltaWeights    = getDeltaWeights;
-NN.Internal.getDeltaHiddenSums = getDeltaHiddenSums;
 
 // Activation
 
@@ -1308,6 +1495,10 @@ NN.NetworkStat = NetworkStat;
 
 // Training
 
+NN.NetworkTrainer = NetworkTrainer;
+NN.NetworkTrainerBackProp = NetworkTrainerBackProp;
+NN.NetworkTrainerBackPropFast = NetworkTrainerBackPropFast;
+NN.getDefTrainer = getDefTrainer;
 NN.TrainingDoneChecker = TrainingDoneChecker;
 NN.TrainingDoneCheckerEps = TrainingDoneCheckerEps;
 NN.TrainingProgressReporter = TrainingProgressReporter;

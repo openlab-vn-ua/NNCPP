@@ -18,7 +18,7 @@ bool sampleXorNetwork()
   if (true)
   {
     auto seed = time(NULL) % 0x7FFF0000 + 1;
-    NN::Internal::PRNG.setSeed(seed);
+    NN::Internal::getPRNG()->setSeed(seed);
     console::log("sampleOcrNetwork", "seed=", seed);
   }
 
@@ -44,7 +44,7 @@ bool sampleXorNetwork2()
   if (true)
   {
     auto seed = time(NULL) % 0x7FFF0000 + 1;
-    NN::Internal::PRNG.setSeed(seed);
+    NN::Internal::getPRNG()->setSeed(seed);
     console::log("sampleOcrNetwork2", "seed=", seed);
   }
 

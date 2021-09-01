@@ -81,12 +81,15 @@ class TrainingProgressReporterConsole : public TrainingProgressReporter
     auto spentTime = beginTimeMetter.millisPassed(); // ms
     if (spentTime <= 0) { spentTime = 1; }
 
+    long steps = args->DATAS.size() * n;
     long scale = NN::NetworkStat::getNetWeightsCount(NET) * args->DATAS.size() * n;
     auto speed = round((1.0 * scale / spentTime));
 
+    auto stepTime = round(((1.0 * spentTime) / steps) * 1000.0);
+
     if (isOk)
     {
-      console::log("TRAINING OK", "iterations:" + STR(n), "time:" + STR(spentTime) + " ms", "speed:" + STR(speed) + "K w*s/s", NET.layers);
+      console::log("TRAINING OK", "iterations:" + STR(n), "time:" + STR(spentTime) + " ms", "speed:" + STR(speed) + "K w*s/s", "step:" + STR(stepTime) + " us", NET.layers);
     }
     else
     {

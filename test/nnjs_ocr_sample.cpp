@@ -328,7 +328,7 @@ bool sampleOcrNetwork()
   if (true)
   {
     auto seed = time(NULL) % 0x7FFF0000 + 1;
-    NN::Internal::PRNG.setSeed(seed);
+    NN::Internal::getPRNG()->setSeed(seed);
     console::log("sampleOcrNetwork", "(samples)", "seed=", seed);
   }
 
@@ -349,7 +349,7 @@ bool sampleOcrNetwork()
   if (true)
   {
     auto seed = time(NULL) % 0x7FFF0000 + 1;
-    NN::Internal::PRNG.setSeed(seed);
+    NN::Internal::getPRNG()->setSeed(seed);
     console::log("sampleOcrNetwork", "(net)", "seed=", seed, "layers=", LAYERS);
   }
 
@@ -449,7 +449,7 @@ bool sampleOcrNetwork()
   // Training
 
   console::log("Training, please wait ...");
-  if (!NN::doTrain(NET, DATAS, TARGS, 0.125, 10000, &NN::TrainingProgressReporterConsole(10), &NN::TrainingDoneCheckerEps(0.2)))
+  if (!NN::doTrain(NET, DATAS, TARGS, 0.125, 500, &NN::TrainingProgressReporterConsole(10), &NN::TrainingDoneCheckerEps()))
   {
     console::log("Training failed (does not to achieve loss error margin?)", NET.layers);
     testResult = false;
@@ -459,7 +459,7 @@ bool sampleOcrNetwork()
 
   // Verification
 
-  auto verifyProc= [](NN::Network &NET, const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, const char *stepName, int imagesPerSample) -> bool
+  auto verifyProc= [](NN::Network &NET, const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, const char *stepName, int imagesPerSample, double maxFailRate = 0.0) -> bool
   {
     bool DUMP_FAILED_IMAGES = false;
 
@@ -546,6 +546,13 @@ bool sampleOcrNetwork()
       auto statFull = 0.0 + statGood + statFail + statWarn;
       auto showPerc = [](double val) -> std::string { return STR("") + STR(round(val * 1000.0) / 10.0); };
       console::log("Verification step " + STR(stepName) + ":Done:" + (" InferenceTime:" + STR(stepTime) + "us") + (" GOOD=" + showPerc(statGood / statFull)) + (" WARN=" + showPerc(statWarn / statFull)) + (" FAIL=" + showPerc(statFail / statFull)));
+      if (maxFailRate > 0)
+      {
+        if ((statFail/ statFull) <= maxFailRate)
+        {
+          isOK = true; // failed, but withing the allowed range - assume ok
+        }
+      }
     }
 
     return(isOK);
@@ -564,21 +571,21 @@ bool sampleOcrNetwork()
   {
     DATASN.push_back(getNoisedInput(DATAS[dataIndex],1));
   }
-  testResult = verifyProc(NET, DATASN, TARGS, "Noised.F1", DATASN.size() / DATASE.size()) && testResult;
+  testResult = verifyProc(NET, DATASN, TARGS, "Noised.F1", DATASN.size() / DATASE.size(), 0.1) && testResult;
 
   DATASN.clear();
   for (size_t dataIndex = 0; dataIndex < DATAS.size(); dataIndex++)
   {
     DATASN.push_back(getNoisedInput(DATAS[dataIndex],30,NOISE_TYPE_PIXEL_DARKER_LIGHTER));
   }
-  testResult = verifyProc(NET, DATASN, TARGS, "Noised.DL30", DATASN.size() / DATASE.size()) && testResult;
+  testResult = verifyProc(NET, DATASN, TARGS, "Noised.DL30", DATASN.size() / DATASE.size(), 0.1) && testResult;
 
   DATASN.clear();
   for (size_t dataIndex = 0; dataIndex < DATAS.size(); dataIndex++)
   {
     DATASN.push_back(getNoisedInput(DATAS[dataIndex],10,NOISE_TYPE_PIXEL_RANDOM));
   }
-  testResult = verifyProc(NET, DATASN, TARGS, "Noised.R10", DATASN.size() / DATASE.size()) && testResult;
+  testResult = verifyProc(NET, DATASN, TARGS, "Noised.R10", DATASN.size() / DATASE.size(), 0.2) && testResult;
 
   return(testResult);
 }
