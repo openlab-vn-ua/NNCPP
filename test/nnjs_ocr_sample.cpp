@@ -208,7 +208,7 @@ std::vector<double> getNoisedInput(const std::vector<double> &L, int noiseCount 
 
   for (auto i = 0; i < noiseCount; i++)
   {
-    auto noiseIndex = NN::Internal::getRandomInt(R.size());
+    auto noiseIndex = NN::Internal::getRandomInt(static_cast<int>(R.size()));
     R[noiseIndex] = makeNoise(R[noiseIndex]);
   }
 
@@ -327,17 +327,18 @@ bool sampleOcrNetwork()
 
   if (true)
   {
-    auto seed = time(NULL) % 0x7FFF0000 + 1;
+    int32_t seed = time(NULL) % 0x7FFF0000 + 1;
     NN::Internal::getPRNG()->setSeed(seed);
     console::log("sampleOcrNetwork", "(samples)", "seed=", seed);
   }
 
   auto SAMPLES = sampleOcrGetSamples(); // [letter][sample] = data[]
+  int  SAMPLES_COUNT = static_cast<int>(SAMPLES.size());
   std::vector<std::vector<double>> RESULTS; // [letter] = R1 array
 
-  for (size_t dataIndex = 0; dataIndex < SAMPLES.size(); dataIndex++)
+  for (int dataIndex = 0; dataIndex < SAMPLES_COUNT; dataIndex++)
   {
-    auto RESULT = NN::NetworkStat::getR1Array(dataIndex,SAMPLES.size(), SAMPLE_OCR_OUT_FOUND, SAMPLE_OCR_OUT_NONE); // target result for this letter
+    auto RESULT = NN::NetworkStat::getR1Array(dataIndex, SAMPLES_COUNT, SAMPLE_OCR_OUT_FOUND, SAMPLE_OCR_OUT_NONE); // target result for this letter
     RESULTS.push_back(RESULT);
   }
 
@@ -348,7 +349,7 @@ bool sampleOcrNetwork()
 
   if (true)
   {
-    auto seed = time(NULL) % 0x7FFF0000 + 1;
+    int32_t seed = time(NULL) % 0x7FFF0000 + 1;
     NN::Internal::getPRNG()->setSeed(seed);
     console::log("sampleOcrNetwork", "(net)", "seed=", seed, "layers=", LAYERS);
   }
@@ -360,7 +361,7 @@ bool sampleOcrNetwork()
   {
     auto IN  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY, NN::TheNeuronFactory<NN::InputNeuron>()); IN->addNeurons(1,NN::TheNeuronFactory<NN::BiasNeuron>());
     auto L1  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY*1, NN::ExtNeuronFactory<NN::ProcNeuronTrainee,NN::ActFuncTrainee*>(actFunc)); L1->addNeurons(1,NN::TheNeuronFactory<NN::BiasNeuron>()); L1->addInputAll(IN);
-    auto OUT = new NN::Layer(SAMPLES.size(), NN::ExtNeuronFactory<NN::ProcNeuronTrainee, NN::ActFuncTrainee*>(outFunc)); OUT->addInputAll(L1); // Outputs: 0=A, 1=B, 2=C, ...
+    auto OUT = new NN::Layer(SAMPLES_COUNT, NN::ExtNeuronFactory<NN::ProcNeuronTrainee, NN::ActFuncTrainee*>(outFunc)); OUT->addInputAll(L1); // Outputs: 0=A, 1=B, 2=C, ...
     NET.addLayer(IN); NET.addLayer(L1); NET.addLayer(OUT);
   }
   else
@@ -368,7 +369,7 @@ bool sampleOcrNetwork()
     auto IN  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY, NN::TheNeuronFactory<NN::InputNeuron>()); IN->addNeurons(1,NN::TheNeuronFactory<NN::BiasNeuron>());
     auto L1  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY*1, NN::ExtNeuronFactory<NN::ProcNeuronTrainee,NN::ActFuncTrainee*>(actFunc)); L1->addNeurons(1,NN::TheNeuronFactory<NN::BiasNeuron>()); L1->addInputAll(IN);
     auto L2  = new NN::Layer(SAMPLE_OCR_SX*SAMPLE_OCR_SY, NN::ExtNeuronFactory<NN::ProcNeuronTrainee,NN::ActFuncTrainee*>(actFunc)); L2->addNeurons(1,NN::TheNeuronFactory<NN::BiasNeuron>()); L2->addInputAll(L1);
-    auto OUT = new NN::Layer(SAMPLES.size(), NN::ExtNeuronFactory<NN::ProcNeuronTrainee,NN::ActFuncTrainee*>(outFunc)); OUT->addInputAll(L2); // Outputs: 0=A, 1=B, 2=C, ...
+    auto OUT = new NN::Layer(SAMPLES_COUNT, NN::ExtNeuronFactory<NN::ProcNeuronTrainee,NN::ActFuncTrainee*>(outFunc)); OUT->addInputAll(L2); // Outputs: 0=A, 1=B, 2=C, ...
     NET.addLayer(IN); NET.addLayer(L1); NET.addLayer(L2); NET.addLayer(OUT);
   }
 
@@ -425,14 +426,14 @@ bool sampleOcrNetwork()
 
   bool DUMP_DATASET = false;
 
-  auto dumpSamples = [](const std::vector<std::vector<double>> &DATAS, int imagesPerSample)
+  auto dumpSamples = [](const std::vector<std::vector<double>> &DATAS, size_t imagesPerSample)
   {
-    int sampleCount = DATAS.size() / imagesPerSample; // sumber of samples
+    size_t sampleCount = DATAS.size() / imagesPerSample; // sumber of samples
 
-    for (auto sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++)
+    for (size_t sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++)
     {
       auto T = std::vector<std::string>();
-      for (auto imageIndex = 0; imageIndex < imagesPerSample; imageIndex++)
+      for (size_t imageIndex = 0; imageIndex < imagesPerSample; imageIndex++)
       {
         T = sampleAddLetTexts(DATAS[sampleIndex*imagesPerSample+imageIndex], T);
       }
@@ -459,7 +460,7 @@ bool sampleOcrNetwork()
 
   // Verification
 
-  auto verifyProc= [](NN::Network &NET, const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, const char *stepName, int imagesPerSample, double maxFailRate = 0.0) -> bool
+  auto verifyProc = [](NN::Network &NET, const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, const char *stepName, size_t imagesPerSample, double maxFailRate = 0.0) -> bool
   {
     bool DUMP_FAILED_IMAGES = false;
 
@@ -564,7 +565,7 @@ bool sampleOcrNetwork()
 
   // Create noised data
 
-  decltype(DATAS) DATASN;
+  decltype(DATAS) DATASN; // would be the same size, as DATAS, so imagesPerSample will be the same
 
   DATASN.clear();
   for (size_t dataIndex = 0; dataIndex < DATAS.size(); dataIndex++)

@@ -81,8 +81,8 @@ class TrainingProgressReporterConsole : public TrainingProgressReporter
     auto spentTime = beginTimeMetter.millisPassed(); // ms
     if (spentTime <= 0) { spentTime = 1; }
 
-    long steps = args->DATAS.size() * n;
-    long scale = NN::NetworkStat::getNetWeightsCount(NET) * args->DATAS.size() * n;
+    auto steps = args->DATAS.size() * n;
+    auto scale = NN::NetworkStat::getNetWeightsCount(NET) * args->DATAS.size() * n;
     auto speed = round((1.0 * scale / spentTime));
 
     auto stepTime = round(((1.0 * spentTime) / steps) * 1000.0);

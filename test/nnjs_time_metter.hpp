@@ -15,7 +15,7 @@ class TimeMetter
 
   public: static tvalue_t millisGlobal()
   {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    return static_cast<tvalue_t>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
   }
 
   protected: enum _:tvalue_t { VOID_TIME = -1 };

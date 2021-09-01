@@ -241,7 +241,7 @@ class ProcNeuron : public BaseNeuron
     return(getRandom(-1, 1));
   }
 
-  protected: double getRandomInitWeightForNNeurons(int n)
+  protected: double getRandomInitWeightForNNeurons(size_t n)
   {
     // Select input range of w. for n neurons
     // Simple range is -1..1,
@@ -733,7 +733,7 @@ namespace NetworkStat // static class
 
     for (size_t i = 2; i < RLen; i++)
     {
-      if (R[i] > R[currMaxIndex]) { prevMaxIndex = currMaxIndex; currMaxIndex = i; }
+      if (R[i] > R[currMaxIndex]) { prevMaxIndex = currMaxIndex; currMaxIndex = static_cast<int>(i); }
     }
 
     if (std::isnan(eps))
@@ -775,7 +775,7 @@ namespace NetworkStat // static class
 
     for (size_t i = 1; i < RLen; i++)
     {
-      if (R[i] > R[currMaxIndex]) { currMaxIndex = i; }
+      if (R[i] > R[currMaxIndex]) { currMaxIndex = static_cast<int>(i); }
     }
 
     return (currMaxIndex);
@@ -1131,7 +1131,7 @@ class NetworkTrainerBackProp : public NetworkTrainer
     // will apply training back recursively
     // recursion controlled by laterIndex
 
-    doTrainStepProcPrevLayer(LOUT, DOS, NET.layers.size()-1);
+    doTrainStepProcPrevLayer(LOUT, DOS, static_cast<int>(NET.layers.size()-1));
 
     for (size_t i = 1; i < NET.layers.size(); i++) // skip input layer
     {
@@ -1242,7 +1242,7 @@ class NetworkTrainerBackPropFast : public NetworkTrainer
 
     // proc hidden layers, skip input layer
 
-    for (int li = NET.layers.size() - 2; li > 0; li--)
+    for (int li = static_cast<int>(NET.layers.size() - 2); li > 0; li--)
     {
       auto& LOUT = NET.layers[li]->neurons;
 

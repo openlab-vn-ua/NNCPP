@@ -19,7 +19,14 @@ int32_t Random::next()
 double Random::nextFloat()
 {
   // We know that result of next() will be 1 to 2147483646 (inclusive).
-  return static_cast<double>(this->next() - this->NEXT_MIN) / (this->NEXT_MAX - this->NEXT_MIN + 1);
+
+  //single-line call, but may emit warnings
+  //return static_cast<double>(this->next() - this->NEXT_MIN) / (this->NEXT_MAX - this->NEXT_MIN + 1);
+
+  //muti step call with explict operations to prevent warning
+  int32_t next = this->next(); next -= this->NEXT_MIN; // 0-based value index
+  int32_t ncnt = this->NEXT_MAX; ncnt -= this->NEXT_MIN; ncnt += 1; // number of distinct prng values
+  return static_cast<double>(next) / ncnt;
 }
 
 int32_t Random::rand()
