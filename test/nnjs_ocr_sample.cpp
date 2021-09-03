@@ -16,7 +16,7 @@ namespace NN { namespace Demo {
 // Utils
 // ----------------------------------------------------
 
-template<typename T1> std::string STR(const T1& x) { return console::toString(x); }
+template<typename T1> std::string STR(const T1& x) { return console::asString(x); }
 
 // Ocr sample
 // ----------------------------------------------------
@@ -327,7 +327,7 @@ bool sampleOcrNetwork()
 
   if (true)
   {
-    int32_t seed = time(NULL) % 0x7FFF0000 + 1;
+    int32_t seed = Random::getRandomSeed(time(NULL));
     NN::Internal::getPRNG()->setSeed(seed);
     console::log("sampleOcrNetwork", "(samples)", "seed=", seed);
   }
@@ -349,7 +349,7 @@ bool sampleOcrNetwork()
 
   if (true)
   {
-    int32_t seed = time(NULL) % 0x7FFF0000 + 1;
+    int32_t seed = Random::getRandomSeed(time(NULL));
     NN::Internal::getPRNG()->setSeed(seed);
     console::log("sampleOcrNetwork", "(net)", "seed=", seed, "layers=", LAYERS);
   }
@@ -450,7 +450,7 @@ bool sampleOcrNetwork()
   // Training
 
   console::log("Training, please wait ...");
-  if (!NN::doTrain(NET, DATAS, TARGS, 0.125, 500, &NN::TrainingProgressReporterConsole(10), &NN::TrainingDoneCheckerEps()))
+  if (!NN::doTrain(NET, DATAS, TARGS, &NN::TrainingParams(0.125, 500), &NN::TrainingProgressReporterConsole(10), &NN::TrainingDoneCheckerEps()))
   {
     console::log("Training failed (does not to achieve loss error margin?)", NET.layers);
     testResult = false;

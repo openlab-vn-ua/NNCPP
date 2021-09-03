@@ -20,7 +20,7 @@
 
 namespace NN { namespace Test {
 
-template<typename T1> std::string STR(const T1& x) { return console::toString(x); }
+template<typename T1> std::string STR(const T1& x) { return console::asString(x); }
 
 #define TEST_DEFAULT_EPS 0.0001
 
@@ -321,7 +321,7 @@ static bool doUnitTest2WithTrainer(NN::NetworkTrainer *trainer)
 
   // Do train step
 
-  NN::doTrain(NET, std::vector<std::vector<double>>{DATA}, std::vector<std::vector<double>>{TARG}, 0.5, 1, NULL, NULL, trainer);
+  NN::doTrain(NET, std::vector<std::vector<double>>{DATA}, std::vector<std::vector<double>>{TARG}, &NN::TrainingParams(0.5, 1), NULL, NULL, trainer);
 
   if (!isFloatAlmostEqual(PNT(L1->neurons[0])->w[0], 0.149780716))
   {

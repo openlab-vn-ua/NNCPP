@@ -38,7 +38,8 @@ inline double getRandom (double min, double max)
 // Return integer in range [from..limit) :: from-inclusive, limit-exclusive
 inline int32_t getRandomInt (int32_t from, int32_t limit)
 {
-  return ((int)std::floor((getPRNG()->nextFloat() * (limit - from)) + from)) % limit; // TODO: Verify me
+  int32_t valcount = limit - from;
+  return ((int)std::floor((getPRNG()->nextFloat() * valcount) + from)) % limit; // TODO: Verify me
 }
 
 // Return integer in range [0, limit) :: 0-inclusive, limit-exclusive
@@ -53,6 +54,8 @@ class NonAssignable // derive from this to prevent copy of move
   private: NonAssignable& operator=(NonAssignable const&) { }
   public:  NonAssignable() {}
 };
+
+const double NaN = std::numeric_limits<double>::quiet_NaN(); // NAN
 
 } // Internal
 
@@ -190,6 +193,8 @@ inline ActFuncTrainee* getDefActFuncTrainee() { return ActFuncSigmoidTrainee::ge
 // .addDeltaOutputSum(ddos)      - increments dos for neuron      [N/A]             .dos+ddos            [N/A]
 // .getDeltaOutputSum()          - return dos for neuron          [N/A]             return .dos          [N/A]
 
+// Base neuron
+// Base class for all neurons
 class BaseNeuron : protected NonAssignable
 {
   // Returns "state" value that neuron currently "holds" (state updated by proc() function)
@@ -203,7 +208,6 @@ class BaseNeuron : protected NonAssignable
 
 // InputNeuron
 // Always return set value as its output
-
 class InputNeuron : public BaseNeuron
 {
   protected: double out = 0.0;
@@ -222,7 +226,6 @@ class InputNeuron : public BaseNeuron
 
 // Proc Neuron
 // Neuron that proccess its input inside proc method
-
 class ProcNeuron : public BaseNeuron
 {
   public: std::vector<BaseNeuron*> inputs;
@@ -232,7 +235,7 @@ class ProcNeuron : public BaseNeuron
 
   protected: double out = 0.0;
 
-  protected: double sum = 0.0; // Used for for training, but kept here to simplify training implemenation
+  protected: double sum = 0.0; // Used for for training, but kept here to simplify training implementation
 
   public: ProcNeuron(ActFunc* func = NULL) : func(func == NULL ? getDefActFunc() : func) { }
 
@@ -321,7 +324,7 @@ class ProcNeuron : public BaseNeuron
      addInputAll(neurons, dummy_empty_weights);
   }
 
-  // Core proccsing
+  // Core proccesing
   // Computes output based on input
 
   protected: double S(double x) { return func->S(x); }
@@ -348,6 +351,8 @@ class ProcNeuron : public BaseNeuron
   }
 };
 
+// Proc neuron "trainee"
+// Regular proc neuron that extended with training data and functions
 class ProcNeuronTrainee : public ProcNeuron
 {
   // ProcNeurons extension used for training
@@ -857,22 +862,6 @@ namespace NetworkStat // static class
     return(result);
   }
 
-  inline double getResultSetAggErrorSum(const std::vector<std::vector<double>> &TARGS, const std::vector<std::vector<double>> &CALCS)
-  {
-    auto count = TARGS.size();
-
-    assert(count == CALCS.size());
-
-    double result = 0;
-
-    for (size_t s = 0; s < count; s++)
-    {
-      result += getResultSampleAggErrorSum(TARGS[s], CALCS[s]);
-    }
-
-    return(result);
-  }
-
   // AggSum to SimpleLoss mutiplier: to be used as loss function (error function), should be mutiplied by 1/2 so derivative will not have 2x in front
 
   const double AGG_ERROR_SUM_TO_SIMPLE_LOSS_MULTIPLY_BY = 0.5;
@@ -889,44 +878,31 @@ namespace NetworkStat // static class
     auto result = getResultSampleAggErrorSum(TARG, CALC);
     auto count = TARG.size();
     assert(count == CALC.size());
-    if (count <= 0) { return NAN; }
+    if (count <= 0) { return NaN; }
     return(result / count);
   }
 
-  inline double getResultSetMSE(const std::vector<std::vector<double>> &TARGS, const std::vector<std::vector<double>> &CALCS)
-  {
-    auto result = getResultSetAggErrorSum(TARGS, CALCS);
-    auto count = TARGS.size();
-    if (count > 0) { count *= TARGS[0].size(); }
-    if (count <= 0) { return NAN; }
-    return(result / count);
-  }
-
-  inline double getResultSetMSEByAggErrorSum(double sum, size_t sampleSize, size_t samplesCount = 1)
+  inline double getResultMSEByAggErrorSum(double sum, size_t sampleSize, size_t samplesCount = 1)
   {
     auto count = samplesCount;
     if (count > 0) { count *= sampleSize; }
-    if (count <= 0) { return NAN; }
+    if (count <= 0) { return NaN; }
     return(sum / count);
   }
 
   // Aggregated error (AKA MSE rooted)
 
-  inline double getResultSetAggError(const std::vector<std::vector<double>> &TARGS, const std::vector<std::vector<double>> &CALCS)
+  inline double getResultAggErrorByAggErrorSum(double sum, size_t sampleSize, size_t samplesCount = 1)
   {
-    return std::sqrt(getResultSetMSE(TARGS, CALCS));
-  }
-
-  inline double getResultSetAggErrorByAggErrorSum(double sum, size_t sampleSize, size_t samplesCount = 1)
-  {
-    return std::sqrt(getResultSetMSEByAggErrorSum(sum, sampleSize, samplesCount));
+    return std::sqrt(getResultMSEByAggErrorSum(sum, sampleSize, samplesCount));
   }
 
   // Misc
 
+  /// Retuns array with only one index of total item set to SET(=1) and all other as NOTSET(=0):
+  /// Example: 0=[1, 0, 0 ...], 1=[0, 1, 0, ...], 2=[0, 0, 1, ...]
   inline std::vector<double> getR1Array(int index, int total, double SET = 1, double NOTSET = 0)
   {
-    // Retuns array with only one index of total item set to SET(=1) and all other as NOTSET(=0): 0=[1, 0, 0 ...], 1=[0, 1, 0, ...], 2=[0, 0, 1, ...]
 
     // if (SET    == null) { SET    = 1; }
     // if (NOTSET == null) { NOTSET = 0; }
@@ -976,16 +952,87 @@ namespace NetworkStat // static class
 // -----------------------------------------------
 // Do network train
 
-// Base class for training alogorith implemenation
+const int    DEFAULT_MAX_EPOCH_COUNT = 50000;
+const double DEFAULT_TRAINING_SPEED  = 0.125;
 
-class NetworkTrainer
+/// Training parameters
+class TrainingParams
 {
-  public: virtual void trainInit(Network& NET) { }
-  public: virtual void trainStep(Network& NET, const std::vector<double>& DATA, const std::vector<double>& TARG, double speed) = 0;
-  public: virtual void trainDone(Network& NET) { }
+  public: double speed = DEFAULT_TRAINING_SPEED;
+  public: int    maxEpochCount = DEFAULT_MAX_EPOCH_COUNT;
+  public: bool   fastVerify = false;
+
+  public: TrainingParams() { }
+  public: TrainingParams(double speed, int maxEpochCount = -1, bool fastVerify = false)
+  {
+    if (speed <= 0) { speed = DEFAULT_TRAINING_SPEED; }
+    if (maxEpochCount <= 0) { maxEpochCount = DEFAULT_MAX_EPOCH_COUNT; }
+    this->speed = speed;
+    this->maxEpochCount = maxEpochCount;
+    this->fastVerify = fastVerify;
+  }
 };
 
-// Back propagation training alogorithm implemenation
+/// Data information
+class TrainingDatasetInfo
+{
+  public: size_t trainDatasetSize;
+};
+
+/// Generic class for training lifecycle
+class TrainingProccessor
+{
+  /// <summary> Start the whole training session </summary>
+  public: virtual void trainStart(Network& NET, TrainingParams &trainingParams, TrainingDatasetInfo &datasetInfo) { }
+
+  /// <summary> Start training eposh (each pass over the whole dataset) </summary>
+  public: virtual void trainEposhStart(Network& NET, int eposhIndex) { }
+
+  /// <summary> End training eposh (each pass over the whole dataset) </summary>
+  public: virtual void trainEposhEnd(Network& NET, int eposhIndex) { }
+
+  /// <summary> End the whole training session </summary>
+  public: virtual void trainEnd(Network& NET, bool isDone) { }
+};
+
+/// Base class for training alogorith implementation
+class NetworkTrainer : public TrainingProccessor
+{
+  /// <summary> Do single training step. Returs result of pre-training run with DATA </summary>
+  public: virtual std::vector<double> trainBySample(Network& NET, const std::vector<double>& DATA, const std::vector<double>& TARG, double speed) = 0;
+};
+
+/// Class checker for training is done
+class TrainingDoneChecker : public TrainingProccessor
+{
+  /// <summary> Check is sample is valid. If all samples are valid, assumed that training is complete </summary>
+  public: virtual bool trainSampleIsValid(Network& NET, const std::vector<double>& TARG, const std::vector<double>& CALC) { return false; }
+
+  /// <summary> Check that eposh result is valid. If this function returns true, training assumed complete </summary>
+  public: virtual bool trainEpochIsValid(Network& NET, int epochIndex) { return false; }
+};
+
+/// Training progress reporter
+/// Will be called during traing to report progress
+/// May rise traing abort event
+
+class TrainingProgressReporter : public TrainingProccessor
+{
+  /// Reports or updates stats by sample. if returns false, training will be aborted
+  public: virtual bool trainSampleReportAndCheckContinue(Network& NET, const std::vector<double>& DATA, const std::vector<double>& TARG, const std::vector<double>& CALC, int epochIndex, size_t sampleIndex)
+  {
+    return true;
+  }
+};
+
+// Training progress void (does nothing) implementation
+
+class TrainingProgressReporterVoid : public TrainingProgressReporter
+{
+  // Does nothing
+};
+
+// Back propagation training alogorithm implementation
 
 class NetworkTrainerBackProp : public NetworkTrainer
 {
@@ -994,7 +1041,7 @@ class NetworkTrainerBackProp : public NetworkTrainer
 
   public: double getDeltaOutputSum(ProcNeuronTrainee* outNeuron, double osme) // osme = output sum margin of error (AKA Expected - Calculated)
   {
-    if (outNeuron == NULL) { return NAN; }
+    if (outNeuron == NULL) { return NaN; }
     double OS = outNeuron->getSum();
     double DOS = outNeuron->SD(OS) * osme;
     return(DOS);
@@ -1030,7 +1077,7 @@ class NetworkTrainerBackProp : public NetworkTrainer
       auto input = dynamic_cast<ProcNeuronTrainee*>(theNeuron->inputs[i]);
       if (input == NULL)
       {
-        ds = NAN; // This neuron input is non-trainee neuron, ds is N/A since we do not know its getSum()
+        ds = NaN; // This neuron input is non-trainee neuron, ds is N/A since we do not know its getSum()
       }
       else // looks like SD here is SD for input neuron (?) use input->SD(input->getSum()) later
       {
@@ -1082,7 +1129,7 @@ class NetworkTrainerBackProp : public NetworkTrainer
     }
   }
 
-  public: virtual void trainStep(Network &NET, const std::vector<double> &DATA, const std::vector<double> &TARG, double speed) override
+  public: virtual std::vector<double> trainBySample(Network &NET, const std::vector<double> &DATA, const std::vector<double> &TARG, double speed) override
   {
     // NET=network, DATA=input, TARG=expeted
     // CALC=calculated output (will be calculated)
@@ -1145,10 +1192,12 @@ class NetworkTrainerBackProp : public NetworkTrainer
         }
       }
     }
+
+    return CALC;
   }
 };
 
-// Back propagation training alogorithm implemenation (Fast)
+// Back propagation training fast alogorithm implementation
 
 class NetworkTrainerBackPropFast : public NetworkTrainer
 {
@@ -1198,7 +1247,7 @@ class NetworkTrainerBackPropFast : public NetworkTrainer
     }
   }
 
-  public: virtual void trainStep(Network &NET, const std::vector<double> &DATA, const std::vector<double> &TARG, double speed) override
+  public: virtual std::vector<double> trainBySample(Network &NET, const std::vector<double> &DATA, const std::vector<double> &TARG, double speed) override
   {
     // NET=network, DATA=input, TARG=expeted
     // CALC=calculated output (will be calculated)
@@ -1269,26 +1318,19 @@ class NetworkTrainerBackPropFast : public NetworkTrainer
         }
       }
     }
+
+    return CALC;
   }
 };
 
 inline NetworkTrainer* getDefTrainer() { static NetworkTrainerBackPropFast defTrainer;  return &defTrainer; }
 
-/// Class checker for training is done
-
-class TrainingDoneChecker
-{
-  /// Function checks if training is done
-  /// DATAS is a list of source data sets
-  /// TARGS is a list of target data sets
-  /// CALCS is a list of result data sets
-  public: virtual bool isTrainingDone(const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, const std::vector<std::vector<double>> &CALCS) = 0;
-};
-
-const double DEFAULT_EPS = 0.1;
+// Class checker for training is done (by results differ from groud truth no more than eps) implementation
 
 class TrainingDoneCheckerEps : public TrainingDoneChecker
 {
+  const double DEFAULT_EPS = NetworkStat::DEFAULT_EPS;
+
   protected: double eps = DEFAULT_EPS;
 
   // Constructor
@@ -1304,153 +1346,125 @@ class TrainingDoneCheckerEps : public TrainingDoneChecker
     this->eps = eps;
   }
 
-  // simple single vectors match
-
-  public: static bool isTrainingDoneSimple(const std::vector<std::vector<double>> &TARGS, const std::vector<std::vector<double>> &CALCS, double eps)
-  {
-    assert(TARGS.size() == CALCS.size());
-
-    for (size_t s = 0; s < TARGS.size(); s++)
-    {
-      if (!NetworkStat::isResultSampleMatchEps(TARGS[s], CALCS[s], eps))
-      {
-        return(false);
-      }
-    }
-
-    return(true);
-  }
-
-  public: virtual bool isTrainingDone(const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, const std::vector<std::vector<double>> &CALCS)
+  public: virtual bool trainSampleIsValid(Network& NET, const std::vector<double>& TARG, const std::vector<double>& CALC)
   override
   {
-    assert(DATAS.size() == TARGS.size());
-    assert(TARGS.size() == CALCS.size());
-    return(isTrainingDoneSimple(TARGS, CALCS, eps));
+    return NetworkStat::isResultSampleMatchEps(TARG, CALC, eps);
   }
-};
-
-/// Training progress reporter
-/// Will be called during traing to report progress
-/// May rise traing abort event
-
-class TrainingProgressReporter
-{
-  // TrainingArgs parameter
-
-  public: class TrainingArgs
-  {
-    public:
-    Network   &NET; 
-    const      std::vector<std::vector<double>> &DATAS;
-    const      std::vector<std::vector<double>> &TARGS;
-    double     SPEED;
-    int        maxStepsCount;
-
-    TrainingArgs(Network &NET, const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, double SPEED, int maxStepsCount)
-      : NET(NET), DATAS(DATAS), TARGS(TARGS), SPEED(SPEED), maxStepsCount(maxStepsCount)
-    {
-    }
-  };
-
-  // TrainingStep parameter
-  // for onTrainingStep
-
-  public: class TrainingStep
-  {
-    public:
-    const      std::vector<std::vector<double>> &CALCS;
-    int        stepIndex;
-
-    TrainingStep(const std::vector<std::vector<double>> &CALCS, int stepIndex)
-      : CALCS(CALCS), stepIndex(stepIndex)
-    {
-    }
-  };
-
-  // Report methods
-
-  public: virtual void onTrainingBegin(TrainingArgs *args) { }
-  public: virtual bool onTrainingStep (TrainingArgs *args, TrainingStep *step) { return true; } // return false to abort training
-  public: virtual void onTrainingEnd  (TrainingArgs *args, bool isOk) { }
 };
 
 // Main training function
 
-const int    DEFAULT_TRAIN_COUNT    = 50000;
-const double DEFAULT_TRAINING_SPEED = 0.125;
-
 /// Train the neural network
-inline bool doTrain(Network &NET, const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, double speed = -1, int MaxN = -1, TrainingProgressReporter *progressReporter = NULL, TrainingDoneChecker *isTrainingDoneChecker = NULL, NetworkTrainer *trainer = NULL)
+inline bool doTrain(Network &NET, const std::vector<std::vector<double>> &DATAS, const std::vector<std::vector<double>> &TARGS, TrainingParams *trainingParams, TrainingProgressReporter *trainingProgressReporter = NULL, TrainingDoneChecker *trainingDoneChecker = NULL, NetworkTrainer *trainer = NULL)
 {
-  if (MaxN < 0)        { MaxN  = DEFAULT_TRAIN_COUNT; }
-  if (speed < 0)       { speed = DEFAULT_TRAINING_SPEED; }
+  TrainingParams trainingParamsDefault;
+  if (trainingParams == NULL) { trainingParams = &trainingParamsDefault; }
 
-  TrainingDoneCheckerEps isTrainingDoneCheckerDefault;
+  TrainingProgressReporterVoid trainingProgressReporterDefault;
+  if (trainingProgressReporter == NULL) { trainingProgressReporter = &trainingProgressReporterDefault; }
 
-  if (isTrainingDoneChecker == NULL) { isTrainingDoneChecker = &isTrainingDoneCheckerDefault; }
+  TrainingDoneCheckerEps trainingDoneCheckerDefault;
+  if (trainingDoneChecker == NULL) { trainingDoneChecker = &trainingDoneCheckerDefault; }
 
   if (trainer == NULL) { trainer = getDefTrainer(); }
 
-  TrainingProgressReporter::TrainingArgs trainArgs(NET, DATAS, TARGS, speed, MaxN);
+  TrainingDatasetInfo trainingDatasetInfo;
+  trainingDatasetInfo.trainDatasetSize = DATAS.size();
 
-  if (progressReporter != NULL) { progressReporter->onTrainingBegin(&trainArgs); }
+  trainer->trainStart(NET, *trainingParams, trainingDatasetInfo);
+  trainingDoneChecker->trainStart(NET, *trainingParams, trainingDatasetInfo);
+  trainingProgressReporter->trainStart(NET, *trainingParams, trainingDatasetInfo);
 
-  trainer->trainInit(NET);
+  auto MaxN  = trainingParams->maxEpochCount;
+  auto speed = trainingParams->speed;
 
   // steps
   bool isDone = false;
-  for (int n = 0; (n < MaxN) && (!isDone); n++)
+  bool isAbort = false;
+  for (int n = 0; (n < MaxN) && (!isDone) && (!isAbort); n++)
   {
-    std::vector<std::vector<double>> CALCS;
-    for (size_t s = 0; s < DATAS.size(); s++)
-    {
-      CALCS.push_back(doProc(NET, DATAS[s])); // Fill output
-    }
+    trainer->trainEposhStart(NET, n);
+    trainingDoneChecker->trainEposhStart(NET, n);
+    trainingProgressReporter->trainEposhStart(NET, n);
 
-    if (progressReporter != NULL)
+    if (!trainingParams->fastVerify)
     {
-      TrainingProgressReporter::TrainingStep step(CALCS, n);
-
-      if (!progressReporter->onTrainingStep(&trainArgs, &step))
+      // strict verify
+      isDone = true;
+      for (size_t s = 0; (s < DATAS.size()) && (!isAbort); s++)
       {
-        // Abort training
-        progressReporter->onTrainingEnd(&trainArgs, false);
-        return(false);
+        auto CALC = doProc(NET, DATAS[s]);
+
+        if (!trainingDoneChecker->trainSampleIsValid(NET, TARGS[s], CALC))
+        {
+          isDone = false;
+        }
+
+        if (!trainingProgressReporter->trainSampleReportAndCheckContinue(NET, DATAS[s], TARGS[s], CALC, n, s))
+        {
+          isDone = false;
+          isAbort = true;
+        }
+      }
+
+      if ((!isDone) && (!isAbort))
+      {
+        for (size_t s = 0; s < DATAS.size(); s++)
+        {
+          trainer->trainBySample(NET, DATAS[s], TARGS[s], speed);
+        }
+      }
+    }
+    else
+    {
+      // fast verify
+      isDone = true;
+      for (size_t s = 0; (s < DATAS.size()) && (!isAbort); s++)
+      {
+        auto CALC_BEFORE_TRAIN = trainer->trainBySample(NET, DATAS[s], TARGS[s], speed);
+
+        // we use calc before train as input
+        // strictly speaking this is incorrect, 
+        // but we assume that single training step will not affect stats very much and will only improve results
+
+        const auto& CALC = CALC_BEFORE_TRAIN;
+
+        if (!trainingDoneChecker->trainSampleIsValid(NET, TARGS[s], CALC))
+        {
+          isDone = false;
+        }
+
+        if (!trainingProgressReporter->trainSampleReportAndCheckContinue(NET, DATAS[s], TARGS[s], CALC, n, s))
+        {
+          isDone = false;
+          isAbort = true;
+        }
       }
     }
 
-    isDone = isTrainingDoneChecker->isTrainingDone(DATAS, TARGS, CALCS);
+    trainer->trainEposhEnd(NET, n);
+    trainingDoneChecker->trainEposhEnd(NET, n);
+    trainingProgressReporter->trainEposhEnd(NET, n);
+ }
 
-    if (!isDone)
-    {
-      for (size_t s = 0; s < DATAS.size(); s++)
-      {
-        trainer->trainStep(NET, DATAS[s], TARGS[s], speed);
-      }
-    }
-  }
-
-  trainer->trainDone(NET);
-
-  if (progressReporter != NULL)
-  { 
-    progressReporter->onTrainingEnd(&trainArgs, isDone);
-  }
+  trainer->trainEnd(NET, isDone);
+  trainingDoneChecker->trainEnd(NET, isDone);
+  trainingProgressReporter->trainEnd(NET, isDone);
 
   return(isDone);
 }
 
 // doTrain with alternative params format
 
-inline bool doTrain(Network* NET, const std::vector<std::vector<double>>& DATAS, const std::vector<std::vector<double>>& TARGS, double SPEED = -1, int MAX_N = -1, TrainingProgressReporter* progressReporter = NULL, TrainingDoneChecker* isTrainingDoneChecker = NULL)
+inline bool doTrain(Network* NET, const std::vector<std::vector<double>>& DATAS, const std::vector<std::vector<double>>& TARGS, TrainingParams* trainingParams, TrainingProgressReporter* trainingProgressReporter = NULL, TrainingDoneChecker* trainingDoneChecker = NULL)
 {
-  return doTrain(*NET, DATAS, TARGS, SPEED, MAX_N, progressReporter, isTrainingDoneChecker);
+  return doTrain(*NET, DATAS, TARGS, trainingParams, trainingProgressReporter, trainingDoneChecker);
 }
 
-inline bool doTrain(Network* NET, const std::vector<std::vector<double>>* DATAS, const std::vector<std::vector<double>>* TARGS, double SPEED = -1, int MAX_N = -1, TrainingProgressReporter* progressReporter = NULL, TrainingDoneChecker* isTrainingDoneChecker = NULL)
+inline bool doTrain(Network* NET, const std::vector<std::vector<double>>* DATAS, const std::vector<std::vector<double>>* TARGS, TrainingParams* trainingParams, TrainingProgressReporter* trainingProgressReporter = NULL, TrainingDoneChecker* trainingDoneChecker = NULL)
 {
-  return doTrain(*NET, *DATAS, *TARGS, SPEED, MAX_N, progressReporter, isTrainingDoneChecker);
+  return doTrain(*NET, *DATAS, *TARGS, trainingParams, trainingProgressReporter, trainingDoneChecker);
 }
 
 /*
@@ -1495,13 +1509,17 @@ NN.NetworkStat = NetworkStat;
 
 // Training
 
+NN.TrainingParams = TrainingParams;
+NN.TrainingDatasetInfo = TrainingDatasetInfo;
+NN.TrainingProccessor = TrainingProccessor;
+NN.TrainingDoneChecker = TrainingDoneChecker;
+NN.TrainingProgressReporter = TrainingProgressReporter;
+NN.TrainingProgressReporterVoid = TrainingProgressReporterVoid;
 NN.NetworkTrainer = NetworkTrainer;
 NN.NetworkTrainerBackProp = NetworkTrainerBackProp;
 NN.NetworkTrainerBackPropFast = NetworkTrainerBackPropFast;
 NN.getDefTrainer = getDefTrainer;
-NN.TrainingDoneChecker = TrainingDoneChecker;
 NN.TrainingDoneCheckerEps = TrainingDoneCheckerEps;
-NN.TrainingProgressReporter = TrainingProgressReporter;
 NN.doTrain = doTrain;
 */
 

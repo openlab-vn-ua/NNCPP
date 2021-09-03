@@ -17,7 +17,7 @@ bool sampleXorNetwork()
 {
   if (true)
   {
-    int32_t seed = time(NULL) % 0x7FFF0000 + 1;
+    int32_t seed = Random::getRandomSeed(time(NULL));
     NN::Internal::getPRNG()->setSeed(seed);
     console::log("sampleOcrNetwork", "seed=", seed);
   }
@@ -34,7 +34,7 @@ bool sampleXorNetwork()
   std::vector<std::vector<double>> DATAS{ std::vector<double>{ 1, 1 }, std::vector<double>{ 1, 0 }, std::vector<double>{ 0, 1 }, std::vector<double>{ 0, 0 } }; // = [ [1, 1], [1, 0], [0, 1], [0, 0]];
   std::vector<std::vector<double>> TARGS{                       { 0 },                       { 1 },                       { 1 },                       { 0 } }; // = [    [0],    [1],    [1],    [0]];
 
-  auto result = NN::doTrain(NET, DATAS, TARGS, -1, -1, &NN::TrainingProgressReporterConsole(1000));
+  auto result = NN::doTrain(NET, DATAS, TARGS, &NN::TrainingParams(-1, -1), &NN::TrainingProgressReporterConsole(1000));
 
   return(result);
 }
@@ -43,7 +43,7 @@ bool sampleXorNetwork2()
 {
   if (true)
   {
-    int32_t seed = time(NULL) % 0x7FFF0000 + 1;
+    int32_t seed = Random::getRandomSeed(time(NULL));
     NN::Internal::getPRNG()->setSeed(seed);
     console::log("sampleOcrNetwork2", "seed=", seed);
   }
@@ -62,7 +62,7 @@ bool sampleXorNetwork2()
   std::vector<std::vector<double>> DATAS{ std::vector<double>{ 1, 1 }, std::vector<double>{ 1, 0 }, std::vector<double>{ 0, 1 }, std::vector<double>{ 0, 0 } }; // = [ [1, 1], [1, 0], [0, 1], [0, 0]];
   std::vector<std::vector<double>> TARGS{                       { 0 },                       { 1 },                       { 1 },                       { 0 } }; // = [    [0],    [1],    [1],    [0]];
 
-  auto result = NN::doTrain(NET, DATAS, TARGS, -1, -1, &NN::TrainingProgressReporterConsole(1000));
+  auto result = NN::doTrain(NET, DATAS, TARGS, &NN::TrainingParams(-1, -1), &NN::TrainingProgressReporterConsole(1000));
 
   return(result);
 }

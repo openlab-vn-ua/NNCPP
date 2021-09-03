@@ -22,10 +22,16 @@ class TrainingProgressReporterConsole : public TrainingProgressReporter
 
   // Constructor
 
-  protected: int  reportInterval = 0;
-  protected: bool reportSamples = false;
+  protected: int    reportInterval = 0;
+  protected: bool   reportSamples = false;
 
-  protected: int  lastSeenIndex = 0;
+  protected: int    maxEpochCount = 0;
+  protected: size_t samplesDone   = 0;
+
+  protected: int    lastSeenIndex = 0;
+
+  protected: double aggErrorSum   = NaN;
+  protected: size_t aggValCount   = 0;
 
   protected: TimeMetter beginTimeMetter;
 
@@ -35,54 +41,76 @@ class TrainingProgressReporterConsole : public TrainingProgressReporter
     if (reportInterval < 0) { reportInterval = 0; }
   }
 
-  public: template<typename T1> static std::string STR(const T1& x) { return console::toString(x); };
+  public: template<typename T1> static std::string STR(const T1& x) { return console::asString(x); };
 
   // methods/callbacks
 
-  public: virtual void onTrainingBegin(TrainingArgs* args)
+  public: virtual void trainStart(Network& NET, TrainingParams& trainingParams, TrainingDatasetInfo& datasetInfo)
+  override
   { 
-    console::log("TRAINING Started", args->SPEED); 
+    maxEpochCount = trainingParams.maxEpochCount;
+    samplesDone = 0;
+    console::log("TRAINING Started", "speed:"+STR(trainingParams.speed), "fastVerify:"+STR(trainingParams.fastVerify));
     beginTimeMetter.start();
   }
 
-  public: virtual bool onTrainingStep(TrainingArgs* args, TrainingStep* step)
+  public: virtual void trainEposhStart(Network& NET, int epochIndex)
+  override
   {
-    lastSeenIndex = step->stepIndex;
+    lastSeenIndex = epochIndex;
+    aggErrorSum = NaN;
+    aggValCount = 0;
+  }
 
-    auto  n = step->stepIndex + 1;
-    auto  MAX_N = args->maxStepsCount;
-    auto& DATAS = args->DATAS;
-    auto& TARGS = args->TARGS;
-    auto& CALCS = step->CALCS;
+  public: virtual bool trainSampleReportAndCheckContinue(Network& NET, const std::vector<double>& DATA, const std::vector<double>& TARG, const std::vector<double>& CALC, int epochIndex, size_t sampleIndex)
+  override
+  {
+    samplesDone++;
+
+    auto n = epochIndex + 1;
+    auto s = sampleIndex;
 
     if ((reportInterval > 0) && ((n % reportInterval) == 0))
     {
-      auto variance = NN::NetworkStat::getResultSetAggError(TARGS, CALCS);
-      console::log("TRAINING AggError[n,s]", MAX_N, n, variance);
+      if (std::isnan(aggErrorSum)) { aggErrorSum = 0.0; }
+
+      aggErrorSum += NN::NetworkStat::getResultSampleAggErrorSum(TARG, CALC);
+      aggValCount += TARG.size();
+
       if (reportSamples)
       {
-        for (size_t s = 0; s < DATAS.size(); s++)
-        {
-          console::log("TRAINING Result.N[n,s]", MAX_N, n, s, DATAS[s], TARGS[s], CALCS[s]);
-        }
+        console::log("TRAINING Result.N[n,s]", maxEpochCount, n, s, DATA, TARG, CALC);
       }
     }
 
     return true;
   }
 
-  public: virtual void onTrainingEnd(TrainingArgs* args, bool isOk)
+  public: virtual void trainEposhEnd(Network& NET, int epochIndex)
+  override
+  {
+    auto n = epochIndex + 1;
+    auto MAX_N = maxEpochCount;
+
+    if ((reportInterval > 0) && ((n % reportInterval) == 0))
+    {
+      auto variance = NN::NetworkStat::getResultAggErrorByAggErrorSum(aggErrorSum, aggValCount);
+      console::log("TRAINING AggError[n,s]", MAX_N, n, variance);
+    }
+  }
+
+  public: virtual void trainEnd(Network& NET, bool isOk)
+  override
   {
     beginTimeMetter.stop();
 
     auto n = lastSeenIndex + 1;
-    auto &NET = args->NET;
 
     auto spentTime = beginTimeMetter.millisPassed(); // ms
     if (spentTime <= 0) { spentTime = 1; }
 
-    auto steps = args->DATAS.size() * n;
-    auto scale = NN::NetworkStat::getNetWeightsCount(NET) * args->DATAS.size() * n;
+    auto steps = samplesDone;
+    auto scale = NN::NetworkStat::getNetWeightsCount(NET) * steps;
     auto speed = round((1.0 * scale / spentTime));
 
     auto stepTime = round(((1.0 * spentTime) / steps) * 1000.0);
