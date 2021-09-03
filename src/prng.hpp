@@ -61,6 +61,11 @@ class Random
 
   /// randFloat(min,max) Returns random in range [min .. max] (inclusive)
   public: double randFloat(double min, double max);
+
+  public: template<typename T> static int32_t getRandomSeed(T timeVal)
+  {
+    return static_cast<int32_t>(timeVal) % 0x7FFF0000 + 1;
+  }
 };
 
 #endif
