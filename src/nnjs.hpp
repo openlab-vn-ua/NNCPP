@@ -242,7 +242,7 @@ inline ActFuncTrainee* getDefActFuncTrainee() { return ActFuncSigmoidTrainee::ge
 class BaseNeuron : protected NonAssignable
 {
   // Returns "state" value that neuron currently "holds" (state updated by proc() function)
-  public: virtual double get() = 0; // abstract
+  public: virtual double get() const = 0; // abstract
 
   // Proccess inputs and change state
   public: virtual void proc() { }
@@ -261,7 +261,7 @@ class InputNeuron : public BaseNeuron
     this->out = value;
   }
 
-  public: virtual double get()
+  public: virtual double get() const
   override
   {
     return (this->out);
@@ -372,7 +372,7 @@ class ProcNeuron : public BaseNeuron
     this->out = S(sum);
   }
 
-  public: virtual double get() override
+  public: virtual double get() const override
   {
     return(this->out);
   }
@@ -384,11 +384,58 @@ class ProcNeuronTrainee : public ProcNeuron
 {
   // ProcNeurons extension used for training
 
-  public: ProcNeuronTrainee(ActFuncTrainee* func = NULL) : ProcNeuron(func == NULL ? getDefActFuncTrainee() : func) { }
+  protected: ActFuncTrainee* train;
+
+  public: ProcNeuronTrainee(ActFuncTrainee* func = NULL) : ProcNeuron(func == NULL ? getDefActFuncTrainee() : func)
+  {
+    train = dynamic_cast<ActFuncTrainee*>(this->func); 
+    assert(train != NULL);
+  }
+
+  // #region inputGetTrainee cache implemenation
+
+  protected: std::vector<BaseNeuron*>        inputTraineesSrc;
+  protected: std::vector<ProcNeuronTrainee*> inputTraineesOut;
+
+  protected: void  inputTraineesInit()
+  {
+    inputTraineesOut.clear();
+    inputTraineesSrc.clear();
+    size_t count = this->inputs.size();
+    for (size_t i = 0; i < count; i++)
+    {
+      inputTraineesSrc.push_back(this->inputs[i]);
+      inputTraineesOut.push_back(dynamic_cast<ProcNeuronTrainee *>(this->inputs[i]));
+    }
+  }
+
+  // #endregion
+
+  // Returns input trainee neuron with index i
+  public: ProcNeuronTrainee* inputGetTrainee(size_t i)
+  {
+    assert(i >= 0);
+    assert(i < this->inputs.size());
+
+    //return dynamic_cast<ProcNeuronTrainee*>(this->inputs[i]); // slow
+
+    // Cache driven implementation
+
+    if (this->inputs.size() != inputTraineesOut.size())
+    {
+      inputTraineesInit(); // size changed
+    }
+    else if (inputTraineesSrc[i] != this->inputs[i])
+    {
+      inputTraineesInit(); // source value changed
+    }
+
+    return inputTraineesOut[i];
+  }
 
   // Main training
 
-  public: double SD(double x) { auto train = dynamic_cast<ActFuncTrainee*>(func); assert(train != NULL); return train->SD(x); }
+  public: double SD(double x) { return train->SD(x); }
 
   public: std::vector<double> nw; // new weights for train
 
@@ -464,7 +511,7 @@ class BiasNeuron : public BaseNeuron
 {
   public: double const BIAS = 1.0;
 
-  public: virtual double get() override
+  public: virtual double get() const override
   {
     return(BIAS);
   }
@@ -1261,7 +1308,7 @@ class NetworkTrainerBackPropFast : public NetworkTrainer
     double ds;
     for (size_t i = 0; i < count; i++)
     {
-      auto input = dynamic_cast<ProcNeuronTrainee*>(theNeuron->inputs[i]);
+      auto input = theNeuron->inputGetTrainee(i); // dynamic_cast<ProcNeuronTrainee*>(theNeuron->inputs[i]);
       if (input == NULL)
       {
         // This neuron input is non-trainee neuron, ds is N/A since we do not know its getSum()
