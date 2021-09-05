@@ -32,14 +32,14 @@ cout << "Training complete";
 
 ### Run inference
 ```
-// NN::doProc(NET, DATA) // run single infrence calculation
+// NN::doProc(NET, DATA) // run single inference calculation
 // std::vector<double> DATA Input (must have same count as number of inputs)
 // Returns result std::vector<double> (will have same count as number of outputs)
 auto CALC = NN::doProc(NET, DATA);
 ```
 
 ## Cousin JavaScript project: NNJS
-There is a NN engine implemenation on JavaScript with (almost) the same API:
+There is a NN engine implementation on JavaScript with (almost) the same API:
 
 https://github.com/openlab-vn-ua/NNJS
 
