@@ -121,25 +121,69 @@ class ActFuncRELUTrainee : public ActFuncTrainee
 
 // Activation : LRELU
 
-const double CalcMathLRELULeak = 0.1; // [0.0..1.0)
+const double CoreMathLRELUDefLeak = 0.001; // [0.0..1.0)
 
-class CalcMathLRELU // static provider
+class CoreMathLRELU // core provider
 {
-  public: static double S(double x)  { return (x < 0) ? x * CalcMathLRELULeak : x; }
-  public: static double SD(double x) { return (x < 0) ? CalcMathLRELULeak : 1.0; }
+  public: double leak = CoreMathLRELUDefLeak;
+  public: CoreMathLRELU(double leak = CoreMathLRELUDefLeak) : leak(leak) { }
+  public: double S(double x)  const { return (x < 0) ? x * leak : x; }
+  public: double SD(double x) const { return (x < 0) ? leak : 1.0; }
 };
 
 class ActFuncLRELU : public ActFunc
 {
-  public: virtual double S(double x) const override { return CalcMathLRELU::S(x); }
+  protected: CoreMathLRELU core;
+  public: ActFuncLRELU(double leak = CoreMathLRELUDefLeak) : core(leak) { }
+  public: virtual double S(double x) const override { return core.S(x); }
   public: static ActFuncLRELU* getInstance() { static ActFuncLRELU s; return &s; }
+  public: static ActFuncLRELU* newInstance(double leak = CoreMathLRELUDefLeak) { return new ActFuncLRELU(leak); }
 };
 
 class ActFuncLRELUTrainee : public ActFuncTrainee
 {
-  public: virtual double S(double x)  const override { return CalcMathLRELU::S(x); }
-  public: virtual double SD(double x) const override { return CalcMathLRELU::SD(x); }
+  protected: CoreMathLRELU core;
+  public: ActFuncLRELUTrainee(double leak = CoreMathLRELUDefLeak) : core(leak) { }
+  public: virtual double S(double x)  const override { return core.S(x); }
+  public: virtual double SD(double x) const override { return core.SD(x); }
   public: static ActFuncLRELUTrainee* getInstance() { static ActFuncLRELUTrainee s; return &s; }
+  public: static ActFuncLRELUTrainee* newInstance(double leak = CoreMathLRELUDefLeak) { return new ActFuncLRELUTrainee(leak); }
+};
+
+// Activation : LLRELU
+
+const double CoreMathLLRELUDefLeak = 0.001; // [0.0..1.0)
+
+class CoreMathLLRELU // core provider
+{
+  public: double nleak = CoreMathLLRELUDefLeak;
+  public: double pleak = CoreMathLLRELUDefLeak;
+  public: CoreMathLLRELU(double leak = CoreMathLLRELUDefLeak) : nleak(leak), pleak(leak) { }
+  public: CoreMathLLRELU(double nleak, double pleak) : nleak(nleak), pleak(pleak) { }
+  public: double S(double x)  const { return (x < 0) ? x * nleak : (x <= 1.0) ? x : 1.0 + (x-1.0) * pleak; }
+  public: double SD(double x) const { return (x < 0) ? nleak : (x <= 1.0) ? 1.0 : pleak; }
+};
+
+class ActFuncLLRELU : public ActFunc
+{
+  protected: CoreMathLLRELU core;
+  public: ActFuncLLRELU(double leak = CoreMathLLRELUDefLeak) : core(leak) { }
+  public: ActFuncLLRELU(double nleak, double pleak) : core(nleak, pleak) { }
+  public: virtual double S(double x) const override { return core.S(x); }
+  public: static ActFuncLLRELU* getInstance() { static ActFuncLLRELU s; return &s; }
+  public: static ActFuncLLRELU* newInstance(double leak = CoreMathLLRELUDefLeak) { return new ActFuncLLRELU(leak); }
+};
+
+class ActFuncLLRELUTrainee : public ActFuncTrainee
+{
+  protected: CoreMathLLRELU core;
+  public: ActFuncLLRELUTrainee(double leak = CoreMathLLRELUDefLeak) : core(leak) { }
+  public: ActFuncLLRELUTrainee(double nleak, double pleak) : core(nleak, pleak) { }
+  public: virtual double S(double x)  const override { return core.S(x); }
+  public: virtual double SD(double x) const override { return core.SD(x); }
+  public: static ActFuncLLRELUTrainee* getInstance() { static ActFuncLLRELUTrainee s; return &s; }
+  public: static ActFuncLLRELUTrainee* newInstance(double leak = CoreMathLLRELUDefLeak) { return new ActFuncLLRELUTrainee(leak); }
+  public: static ActFuncLLRELUTrainee* newInstance(double nleak, double pleak) { return new ActFuncLLRELUTrainee(nleak, pleak); }
 };
 
 // Activation : Tanh

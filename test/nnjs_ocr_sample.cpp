@@ -21,6 +21,8 @@ template<typename T1> std::string STR(const T1& x) { return console::asString(x)
 // Ocr sample
 // ----------------------------------------------------
 
+const int FIXED_SEED = 1; // 0=use random seed
+
 const int SAMPLE_OCR_SX = 9;
 const int SAMPLE_OCR_SY = 8;
 
@@ -327,7 +329,7 @@ bool sampleOcrNetwork()
 
   if (true)
   {
-    int32_t seed = Random::getRandomSeed(time(NULL));
+    int32_t seed = FIXED_SEED > 0 ? FIXED_SEED : Random::getRandomSeed(time(NULL));
     NN::Internal::getPRNG()->setSeed(seed);
     console::log("sampleOcrNetwork", "(samples)", "seed=", seed);
   }
@@ -349,13 +351,33 @@ bool sampleOcrNetwork()
 
   if (true)
   {
-    int32_t seed = Random::getRandomSeed(time(NULL));
+    int32_t seed = FIXED_SEED > 0 ? FIXED_SEED : Random::getRandomSeed(time(NULL));
     NN::Internal::getPRNG()->setSeed(seed);
     console::log("sampleOcrNetwork", "(net)", "seed=", seed, "layers=", LAYERS);
   }
 
-  ActFuncTrainee* actFunc = NN::ActFuncSigmoidTrainee::getInstance();
-  ActFuncTrainee* outFunc = NN::ActFuncSigmoidTrainee::getInstance();
+  //Not working     : seed=1 no train // TODO: Check why RELU does not work here (error is 0.5 all they way during training)
+  //ActFuncTrainee* actFunc = NN::ActFuncRELUTrainee::getInstance();
+  //ActFuncTrainee* outFunc = NN::ActFuncRELUTrainee::getInstance();
+
+  //Works very good : seed=1 train in  41 iterations // Stat: 100.0%/100.0%/100.0%/ 97.1% // InfTime:71us(65us?) // INP/OUT 0.0..1.0 // Leak:0.1
+  //Works good      : seed=1 train in  84 iterations // Stat: 100.0%/100.0%/100.0%/ 95.7% // InfTime:71us(65us?) // INP/OUT 0.0..1.0 // Leak:0.01
+  //Works EXCELLENT : seed=1 train in  85 iterations // Stat: 100.0%/100.0%/100.0%/100.0% // InfTime:71us(65us?) // INP/OUT 0.0..1.0 // Leak:0.001 * [def]
+  //Works good      : seed=1 train in 356 iterations // Stat: 100.0%/100.0%/100.0%/ 98.6% // InfTime:71us(65us?) // INP/OUT 0.0..1.0 // Leak:0.0001
+  NN::ActFuncLRELUTrainee actProc(0.001); ActFuncTrainee* actFunc = &actProc;
+  NN::ActFuncLRELUTrainee outProc(0.001); ActFuncTrainee* outFunc = &outProc;
+
+  //Works good      : seed=1 train in  71 iterations // Stat: 100.0%/100.0%/100.0%/ 94.4% // InfTime:71us(65us?) // INP/OUT 0.0..1.0 // Leak:0.001 * [def]
+  //NN::ActFuncLLRELUTrainee actProc(0.001); ActFuncTrainee* actFunc = &actProc;
+  //NN::ActFuncLLRELUTrainee outProc(0.001); ActFuncTrainee* outFunc = &outProc;
+
+  //Works good      : seed=1 train in 255 iterations // Stat: 100.0%/ 98.6%/100.0%/ 88.6% // InfTime:71us
+  //ActFuncTrainee* actFunc = NN::ActFuncSigmoidTrainee::getInstance();
+  //ActFuncTrainee* outFunc = NN::ActFuncSigmoidTrainee::getInstance();
+
+  //Works norm      : seed=1 train in 442 iterations // Stat: 100.0%/ 98.6%/ 92.9%/ 84.3% // InfTime:71us
+  //ActFuncTrainee* actFunc = NN::ActFuncTanhTrainee::getInstance();
+  //ActFuncTrainee* outFunc = NN::ActFuncTanhTrainee::getInstance();
 
   if (LAYERS == 3)
   {
@@ -450,7 +472,7 @@ bool sampleOcrNetwork()
   // Training
 
   console::log("Training, please wait ...");
-  if (!NN::doTrain(NET, DATAS, TARGS, &NN::TrainingParams(0.125, 500), &NN::TrainingProgressReporterConsole(10), &NN::TrainingDoneCheckerEps()))
+  if (!NN::doTrain(NET, DATAS, TARGS, &NN::TrainingParams(0.125, 1000), &NN::TrainingProgressReporterConsole(10), &NN::TrainingDoneCheckerEps()))
   {
     console::log("Training failed (does not to achieve loss error margin?)", NET.layers);
     testResult = false;
@@ -538,23 +560,49 @@ bool sampleOcrNetwork()
       }
     }
 
+    auto showPerc = [](double val) -> std::string { return STR("") + STR(round(val * 1000.0) / 10.0) + "%"; };
+
+    auto statFull = statGood + statFail + statWarn;
+    auto rateNorm = statFull > 0 ? (1.0 * statGood + statWarn) / statFull : 0.0;
+
+    std::string statText = "";
+
     if (isOK)
     {
-      console::log("Verification step " + STR(stepName) + ":OK [100%]" + (" InferenceTime:" + STR(stepTime) + "us"));
+      statText = "Good";
     }
     else
     {
-      auto statFull = 0.0 + statGood + statFail + statWarn;
-      auto showPerc = [](double val) -> std::string { return STR("") + STR(round(val * 1000.0) / 10.0); };
-      console::log("Verification step " + STR(stepName) + ":Done:" + (" InferenceTime:" + STR(stepTime) + "us") + (" GOOD=" + showPerc(statGood / statFull)) + (" WARN=" + showPerc(statWarn / statFull)) + (" FAIL=" + showPerc(statFail / statFull)));
+      statText = "Fail";
       if (maxFailRate > 0)
       {
-        if ((statFail/ statFull) <= maxFailRate)
+        if ((1.0 * statFail / statFull) <= maxFailRate)
         {
           isOK = true; // failed, but withing the allowed range - assume ok
+          statText = "Warn";
         }
       }
     }
+
+    std::string msg;
+
+    msg  = "";
+    msg += "Verification step " + STR(stepName) + STR(" ");
+    msg += "Status:" + STR(statText) + STR(" ");
+    msg += "Rate:" + showPerc(rateNorm) + STR(" ");
+    msg += "InfTime:" + STR(stepTime) + "us" + " ";
+
+    if (statWarn > 0)
+    {
+      msg += "Warn:" + showPerc(1.0 * statWarn / statFull) + STR(" ");
+    }
+
+    if (statFail > 0)
+    {
+      msg += "Fail:" + showPerc(1.0 * statFail / statFull) + STR(" ");
+    }
+
+    console::log(msg);
 
     return(isOK);
   };
