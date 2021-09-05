@@ -303,22 +303,6 @@ class ProcNeuron : public BaseNeuron
     return (getRandom(-wrange, wrange));
   }
 
-  protected: double calcOutputSum(const std::vector<double> &ins)
-  {
-    double out = 0;
-
-    size_t count = this->w.size();
-
-    assert(ins.size() == count);
-
-    for (size_t i = 0; i < count; i++)
-    {
-      out += ins[i] * this->w[i];
-    }
-
-    return(out);
-  }
-
   public: void addInput(const BaseNeuron *neuron, double w)
   {
     this->inputs.push_back(const_cast<BaseNeuron *>(neuron));
@@ -377,16 +361,15 @@ class ProcNeuron : public BaseNeuron
   {
     assert(this->inputs.size() == this->w.size());
 
-    std::vector<double> ins;
-
+    double sum = 0;
     size_t count = this->inputs.size();
     for (size_t i = 0; i < count; i++)
     {
-      ins.push_back(this->inputs[i]->get());
+      sum += this->inputs[i]->get() * this->w[i];
     }
 
-    this->sum = calcOutputSum(ins);
-    this->out = S(this->sum);
+    this->sum = sum;
+    this->out = S(sum);
   }
 
   public: virtual double get() override
